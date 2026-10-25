@@ -1,0 +1,40 @@
+services:
+  image-studio:
+    image: node:24-slim
+    working_dir: /app
+    command: ["node", "dist-server/index.mjs"]
+    user: "1000:1000"
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 2.0
+    pids_limit: 128
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8793)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    environment:
+      HOST: 127.0.0.1
+      PORT: ${PORT:-8793}
+      DATA_DIR: /app/data
+      GATEWAY_BASE_URL: ${GATEWAY_BASE_URL:?Set your Sub2API URL}
+      IMAGE_MODEL: ${IMAGE_MODEL:-gpt-image-2.5}
+      CHAT_MODEL: ${CHAT_MODEL:-gpt-6-luna}
+      JOB_CONCURRENCY: ${JOB_CONCURRENCY:-10}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the public HTTPS origin}
+      PUBLIC_ORIGINS: ${PUBLIC_ORIGINS:-}
+      DEMO_MODE: "0"
+      SSO_ENABLED: ${SSO_ENABLED:-0}
+      SSO_SOURCES: ${SSO_SOURCES:-[]}
+    volumes:
+      - ../dist:/app/dist:ro
+      - ../dist-server:/app/dist-server:ro
+      - ../data:/app/data

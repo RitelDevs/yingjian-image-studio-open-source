@@ -1,0 +1,524 @@
+[
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "references/styles/claymation.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/claymation.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Color Palette",
+      "Visual Elements"
+    ],
+    "method": "中文翻译并选取与本风格相关的规则",
+    "adaptations": [
+      "保留现有头像入口；主体、姿势与人数来自用户，而非额外设计角色。",
+      "未采用原文的立体黏土字，未填写标题时不加文字。"
+    ],
+    "sourceSha256": "c55e726c0d1156f2715107dd3b3d3c60af385b48db33b6121cb569494aa59644",
+    "verification": "已读取本机安装的原始规则文件，记录其内容哈希及上游对应位置",
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-claymation.md",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt"
+  },
+  {
+    "skill": "krea-marketing",
+    "upstreamFile": "references/product-photography.md",
+    "url": "https://github.com/krea-ai/skills/blob/main/krea-marketing/references/product-photography.md",
+    "author": "Krea AI",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Core direction",
+      "Color / Saturated seamless field",
+      "Light and drama / C — Hard flash on a colored seamless",
+      "Camera, frame, and finish",
+      "Product, label, and type rendering"
+    ],
+    "method": "从原文指定章节抽取、翻译，选定其中一个明确预设",
+    "adaptations": [
+      "从原文多个选项中固定选用硬闪、单色背景、清晰数字质感；用户明确设置优先。",
+      "不采用原文要求虚构品牌和包装小字的段落；只保留用户提供的标识。",
+      "画幅使用网站设置，未采用原文默认竖幅。"
+    ],
+    "verification": "已从 GitHub 公开文件页提取并逐节核对原始规则，保存内容哈希与完整许可证",
+    "snapshot": "Skill原始规则-2026-10-24/krea-product-photography.md",
+    "sourceSha256": "1c77fafc4a80bde34bc7873fa78e7d1f482916956eaa670e0edf0cf0919e8a95",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-krea.txt"
+  },
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "references/styles/retro-pop-grid.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/retro-pop-grid.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Color Palette",
+      "Visual Elements",
+      "Typography",
+      "Style Enforcement",
+      "Avoid"
+    ],
+    "method": "中文翻译并选取与本风格相关的规则",
+    "adaptations": [
+      "不采用原文允许的额外英文装饰字，画面只使用用户标题。",
+      "去除信息图专用警示符号和表情示例，主体按用户填写。"
+    ],
+    "sourceSha256": "d59faa1639c15a6624c51746d9725de50a40c448dbbeba8faf6eb00ac3468023",
+    "verification": "已读取本机安装的原始规则文件，记录其内容哈希及上游对应位置",
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-retro-pop-grid.md",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt"
+  },
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "references/styles/storybook-watercolor.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/storybook-watercolor.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Color Palette",
+      "Visual Elements"
+    ],
+    "method": "中文翻译并选取与本风格相关的规则",
+    "adaptations": [
+      "不自动采用手写装饰文字；叙事主体与场景由用户提供。"
+    ],
+    "sourceSha256": "d7067bc69f56f3fad42e3f2671c86317c36962f38fd69a181f9d606d6fd54f88",
+    "verification": "已读取本机安装的原始规则文件，记录其内容哈希及上游对应位置",
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-storybook-watercolor.md",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt"
+  },
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "references/styles/craft-handmade.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/craft-handmade.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Color Palette",
+      "Variants / Paper-cutout",
+      "Visual Elements",
+      "Style Enforcement"
+    ],
+    "method": "中文翻译并选取与本风格相关的规则",
+    "adaptations": [
+      "只选用 Paper-cutout 分支，不混入另一手绘分支。",
+      "不自动增加关键词、卡通人物或剪纸字。"
+    ],
+    "sourceSha256": "91740549239ab391d18532c83317a137c68cb11ab33ea154130db68a791288c0",
+    "verification": "已读取本机安装的原始规则文件，记录其内容哈希及上游对应位置",
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-craft-handmade.md",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt"
+  },
+  {
+    "skill": "krea-marketing",
+    "upstreamFile": "references/product-photography.md",
+    "url": "https://github.com/krea-ai/skills/blob/main/krea-marketing/references/product-photography.md",
+    "author": "Krea AI",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Core direction",
+      "Color / Drained warm film",
+      "Light and drama / G — Found practical light",
+      "Camera, frame, and finish"
+    ],
+    "method": "从原文指定章节抽取、翻译，选定其中一个明确预设",
+    "adaptations": [
+      "仅抽取光线、色彩、镜头和颗粒规则，推广到用户的生活场景；原文主要面向商品摄影。",
+      "不强制添加产品、品牌、桌面道具或参考案例中的人物。"
+    ],
+    "verification": "已从 GitHub 公开文件页提取并逐节核对原始规则，保存内容哈希与完整许可证",
+    "snapshot": "Skill原始规则-2026-10-24/krea-product-photography.md",
+    "sourceSha256": "1c77fafc4a80bde34bc7873fa78e7d1f482916956eaa670e0edf0cf0919e8a95",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-krea.txt"
+  },
+  {
+    "skill": "baoyu-slide-deck",
+    "upstreamFile": "references/styles/minimal.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-slide-deck/references/styles/minimal.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Background",
+      "Typography",
+      "Color Palette",
+      "Visual Elements",
+      "Style Rules"
+    ],
+    "method": "中文翻译并选取与本风格相关的规则",
+    "adaptations": [
+      "将单页演示图规则用于海报；保留用户标题上限，不采用原文每页最多 10 词的限制或截断用户标题。",
+      "强调色沿用用户明确选择，否则使用蓝色。"
+    ],
+    "sourceSha256": "8edc54afaa281678b1f8ab17baba969782ea5c2e6344ddedaaf085f1d74aed49",
+    "verification": "已读取本机安装的原始规则文件，记录其内容哈希及上游对应位置",
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-minimal.md",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt"
+  },
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "references/styles/technical-schematic.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/technical-schematic.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Color Palette",
+      "Variants / Isometric",
+      "Visual Elements"
+    ],
+    "method": "中文翻译并选取与本风格相关的规则",
+    "adaptations": [
+      "只采用 Isometric 分支，不混入白线蓝底的 Blueprint 分支。",
+      "不自动添加尺寸线、测量数据或技术标签；未提供的数据不能凭空编造。"
+    ],
+    "sourceSha256": "2b21ce445c6a2b1ef280c2d7b4cb8e87e2f6e720f85cb68a8ba40a5c2d73a12d",
+    "verification": "已读取本机安装的原始规则文件，记录其内容哈希及上游对应位置",
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-technical-schematic.md",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt"
+  },
+  {
+    "skill": "prompt-images",
+    "upstreamFile": "skills/prompt-images/SKILL.md",
+    "url": "https://github.com/replicate/skills/blob/main/skills/prompt-images/SKILL.md",
+    "author": "Replicate",
+    "license": "Apache-2.0",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Style transfer",
+      "Photographic language"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "引用 Skill 的风格命名、特征展开及保持构图方法；新海诚为用户指定方向。公开分镜示例短节选另存，视觉细化是本地适配。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。",
+      "新海诚风格的公开分镜短语见 Skill原始规则-扩展-2026-10-24/storyboard-source-excerpt.md；仅引用名称与方法，不复制完整未授权提示词。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/replicate-prompt-images.md",
+    "sourceSha256": "fd20fc7552f7ca550776bd320de028ae0fd222a038cb14ebb2943b231099b3ae",
+    "licenseSnapshot": "Skill原始规则-扩展-2026-10-24/LICENSE-replicate.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-cover-image",
+    "upstreamFile": "skills/baoyu-cover-image/SKILL.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-cover-image/SKILL.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Five Dimensions",
+      "Create Prompt"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "将五维配置固定为一个测试预设，不执行原 Skill 的多后端或付费工作流。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/baoyu-cover-image.md",
+    "sourceSha256": "36804fce98bcb9ebe4a51c26f6f276a807805aab980ca4a0718daa40a5cc7fda",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-xhs-images",
+    "upstreamFile": "skills/baoyu-xhs-images/SKILL.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-xhs-images/SKILL.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Layouts (8)",
+      "Dimensions"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "把原图组工作流缩成一张卡片，允许用户正文作为画面文字。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/baoyu-xhs-images.md",
+    "sourceSha256": "17bf5498641cc60cb98f0cc15fbea27fd42777d119a39fb54fd6418840442bba",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-comic",
+    "upstreamFile": "skills/baoyu-comic/SKILL.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-comic/SKILL.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Art, Tone & Preset Catalogue",
+      "Step 7: Image Generation"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "选用单页四格预设；角色与剧情只用用户输入，不自动进行多页批量生成。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/baoyu-comic.md",
+    "sourceSha256": "98d5de8650a3401c1ee97b3f78ebacef72f3f570ef7fe7290b192ac7d24330bc",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-comic",
+    "upstreamFile": "skills/baoyu-comic/SKILL.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-comic/SKILL.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Step 7: Image Generation",
+      "Reference Images"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "提取角色锚点方法并应用到单页设定表，视图数量由用户决定。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/baoyu-comic.md",
+    "sourceSha256": "98d5de8650a3401c1ee97b3f78ebacef72f3f570ef7fe7290b192ac7d24330bc",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-cover-image",
+    "upstreamFile": "skills/baoyu-cover-image/SKILL.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-cover-image/SKILL.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Five Dimensions",
+      "Create Prompt"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "按封面 Skill 的五维结构配置旅行场景预设，画幅仍由网站设置。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/baoyu-cover-image.md",
+    "sourceSha256": "36804fce98bcb9ebe4a51c26f6f276a807805aab980ca4a0718daa40a5cc7fda",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "krea-marketing",
+    "upstreamFile": "krea-marketing/workflows/product-packaging-design.md",
+    "url": "https://github.com/krea-ai/skills/blob/main/krea-marketing/workflows/product-packaging-design.md",
+    "author": "Krea AI",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Core direction",
+      "Composition grammar",
+      "Type, color, image, and material"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "提取物理排版与材质原则，不自动添加原文中的多款包装、手部或道具。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/krea-packaging.md",
+    "sourceSha256": "f338cf9e4b8e86b7a06bb076f4a5ffe340dee7b6435a942cd0dff669709339e3",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-krea.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "scientific-schematics",
+    "upstreamFile": "skills/scientific-schematics/SKILL.md",
+    "url": "https://github.com/K-Dense-AI/scientific-agent-skills/blob/main/skills/scientific-schematics/SKILL.md",
+    "author": "K-Dense Inc.",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "AI Generation Best Practices",
+      "Overview"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "只提取制图规则，使用项目 Images2.5；不调用原 Skill 的其他模型或把审核分数当作科学准确保证。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/scientific-schematics.md",
+    "sourceSha256": "e15d761ef88013c98fd5b19cc144aba7336e20dbadf340db17bd1ba2227d1d69",
+    "licenseSnapshot": "Skill原始规则-扩展-2026-10-24/LICENSE-kdense.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "prompt-images",
+    "upstreamFile": "skills/prompt-images/SKILL.md",
+    "url": "https://github.com/replicate/skills/blob/main/skills/prompt-images/SKILL.md",
+    "author": "Replicate",
+    "license": "Apache-2.0",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Style transfer",
+      "Character consistency"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "采用风格迁移与保持项结构，新海诚为用户指定方向；不复制分镜示例角色或场景。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。",
+      "新海诚风格的公开分镜短语见 Skill原始规则-扩展-2026-10-24/storyboard-source-excerpt.md；仅引用名称与方法，不复制完整未授权提示词。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/replicate-prompt-images.md",
+    "sourceSha256": "fd20fc7552f7ca550776bd320de028ae0fd222a038cb14ebb2943b231099b3ae",
+    "licenseSnapshot": "Skill原始规则-扩展-2026-10-24/LICENSE-replicate.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "skills/baoyu-infographic/references/styles/claymation.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/claymation.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Visual Elements",
+      "Color Palette"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "从黏土风格提取材质规则，加上明确的身份保持边界。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-claymation.md",
+    "sourceSha256": "c55e726c0d1156f2715107dd3b3d3c60af385b48db33b6121cb569494aa59644",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "prompt-images",
+    "upstreamFile": "skills/prompt-images/SKILL.md",
+    "url": "https://github.com/replicate/skills/blob/main/skills/prompt-images/SKILL.md",
+    "author": "Replicate",
+    "license": "Apache-2.0",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Image editing / Background editing",
+      "Photographic language"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "把背景编辑方法固定为白底商品场景，光线是该预设选择而非另一个模型参数。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/replicate-prompt-images.md",
+    "sourceSha256": "fd20fc7552f7ca550776bd320de028ae0fd222a038cb14ebb2943b231099b3ae",
+    "licenseSnapshot": "Skill原始规则-扩展-2026-10-24/LICENSE-replicate.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "krea-marketing",
+    "upstreamFile": "krea-marketing/workflows/product-photo-lifestyle.md",
+    "url": "https://github.com/krea-ai/skills/blob/main/krea-marketing/workflows/product-photo-lifestyle.md",
+    "author": "Krea AI",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Recipe",
+      "Clarify"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "将原工作流的场景选择固定为窗边台面，去掉多平台工具调用。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/krea-lifestyle.md",
+    "sourceSha256": "c84b272d19e4ebd63e196fa6a9dfd96a1609537e3ecbbf394209f4dadc8ef6af",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-krea.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "baoyu-infographic",
+    "upstreamFile": "skills/baoyu-infographic/references/styles/storybook-watercolor.md",
+    "url": "https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-infographic/references/styles/storybook-watercolor.md",
+    "author": "Jim Liu",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Visual Elements",
+      "Color Palette"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "从水彩规则提取表现特征，用照片作为内容锚点。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-2026-10-24/baoyu-storybook-watercolor.md",
+    "sourceSha256": "d7067bc69f56f3fad42e3f2671c86317c36962f38fd69a181f9d606d6fd54f88",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-baoyu.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "krea-marketing",
+    "upstreamFile": "krea-marketing/references/product-photography.md",
+    "url": "https://github.com/krea-ai/skills/blob/main/krea-marketing/references/product-photography.md",
+    "author": "Krea AI",
+    "license": "MIT",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Drained warm film",
+      "Camera, frame, and finish"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "选取胶片调性与全画面颗粒规则，作为只调色、不换场景的固定编辑。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-2026-10-24/krea-product-photography.md",
+    "sourceSha256": "1c77fafc4a80bde34bc7873fa78e7d1f482916956eaa670e0edf0cf0919e8a95",
+    "licenseSnapshot": "Skill原始规则-2026-10-24/LICENSE-krea.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "prompt-images",
+    "upstreamFile": "skills/prompt-images/SKILL.md",
+    "url": "https://github.com/replicate/skills/blob/main/skills/prompt-images/SKILL.md",
+    "author": "Replicate",
+    "license": "Apache-2.0",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Be specific and unambiguous",
+      "Style transfer",
+      "Character consistency"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "根据具体材质与身份保持方法实例化毛毡材质；上游并非现成宠物毛毡专用模板。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/replicate-prompt-images.md",
+    "sourceSha256": "fd20fc7552f7ca550776bd320de028ae0fd222a038cb14ebb2943b231099b3ae",
+    "licenseSnapshot": "Skill原始规则-扩展-2026-10-24/LICENSE-replicate.txt",
+    "verification": "实际源文件已保存并核对"
+  },
+  {
+    "skill": "prompt-images",
+    "upstreamFile": "skills/prompt-images/SKILL.md",
+    "url": "https://github.com/replicate/skills/blob/main/skills/prompt-images/SKILL.md",
+    "author": "Replicate",
+    "license": "Apache-2.0",
+    "reviewedOn": "2026-10-24",
+    "sections": [
+      "Image editing / General principles",
+      "Image editing / Inpainting and outpainting"
+    ],
+    "method": "原始规则提取、中文适配与固定场景实例化",
+    "adaptations": [
+      "应用指定编辑范围与保持其余内容的方法；上游不是修复专用模板，实际结果须核对。",
+      "使用现有 Images2.5 接口，未执行原 Skill 的工具调用。"
+    ],
+    "snapshot": "Skill原始规则-扩展-2026-10-24/replicate-prompt-images.md",
+    "sourceSha256": "fd20fc7552f7ca550776bd320de028ae0fd222a038cb14ebb2943b231099b3ae",
+    "licenseSnapshot": "Skill原始规则-扩展-2026-10-24/LICENSE-replicate.txt",
+    "verification": "实际源文件已保存并核对"
+  }
+]

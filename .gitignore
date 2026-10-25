@@ -1,0 +1,48 @@
+# Dependencies, build products and local runtime state
+node_modules/
+dist/
+dist-server/
+release/
+data/
+coverage/
+playwright-report/
+test-results/
+
+# Credentials and generated configuration; examples are safe to track
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+auth.json
+credentials.json
+
+# User databases, archives and logs
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+*.zip
+*.7z
+*.tar.gz
+
+# Local operational reports, test-account notes and design history
+INTEGRATION.md
+DESIGN-REVIEW.md
+deploy/DEPLOY.md
+deploy/INCIDENT-*.md
+
+# Editor and OS files
+.codex/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated release markers and dependency staging
+.release-generated

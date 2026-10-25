@@ -1,0 +1,49 @@
+.inspiration-home { width: 100%; }
+.creation-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.creation-shortcuts > button { display: flex; align-items: center; gap: 16px; min-width: 0; min-height: 88px; padding: 20px; border: 1px solid var(--glass-edge); border-radius: 20px; background: #ffffff33; color: var(--ink); text-align: left; }
+.creation-shortcuts > button:hover { background: #ffffff99; transform: translateY(-2px); box-shadow: 0 8px 24px #2345680d; }
+.shortcut-icon { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 13px; color: var(--blue-strong); background: #ffffff80; }
+.creation-shortcuts strong { display: block; font-size: 15px; line-height: 1.5; font-weight: 600; }
+.creation-shortcuts small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.creation-shortcuts > button > svg:last-child { flex: 0 0 18px; margin-left: auto; color: var(--muted); }
+.style-starters { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
+.style-starters > span { flex: 0 0 auto; color: var(--muted); font-size: 12px; }
+.style-starters > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.style-starters button { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 8px 12px; border: 1px solid #ffffff80; border-radius: 50px; background: #ffffff40; color: #435b70; font-size: 12px; }
+.style-starters button:hover { background: #ffffffcc; color: var(--blue-strong); transform: translateY(-1px); }
+@container studio (max-width: 760px) {
+  .creation-shortcuts > button { gap: 12px; padding: 16px; }
+  .creation-shortcuts > button > svg:last-child { display: none; }
+  .style-starters { align-items: start; gap: 12px; }
+  .style-starters > span { padding-block: 12px; }
+  .style-starters > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1; }
+  .style-starters button { min-height: 44px; }
+}
+@container studio (max-width: 560px) {
+  .creation-shortcuts { gap: 12px; }
+  .creation-shortcuts > button { min-height: 76px; padding: 12px; border-radius: 16px; }
+  .shortcut-icon { display: none; }
+  .creation-shortcuts strong { font-size: 14px; }
+  .creation-shortcuts small { font-size: 11px; }
+  .style-starters { gap: 8px; }
+  .style-starters > div { gap: 8px; }
+  .style-starters button { padding-inline: 10px; gap: 4px; }
+}
+@container studio (max-width: 360px) {
+  .style-starters { flex-direction: column; }
+  .style-starters > span { padding: 0; }
+  .style-starters > div { width: 100%; }
+}
+
+.inspiration-market-entry { display: flex; align-items: center; gap: 18px; width: 100%; min-height: 90px; margin-top: 16px; padding: 18px 22px; border: 1px solid #ffffffb3; border-radius: 20px; background: linear-gradient(105deg, #e0effbcc, #ffffff80); color: var(--ink); text-align: left; }
+.inspiration-market-entry:hover { background: linear-gradient(105deg, #d8eaf9, #ffffffe0); box-shadow: 0 6px 18px #2345680a; }
+.inspiration-market-art { position: relative; display: grid; place-items: center; flex: 0 0 60px; height: 48px; color: var(--blue-strong); }
+.inspiration-market-art i { position: absolute; width: 30px; height: 39px; border: 2px solid white; border-radius: 6px; background: #b7d0e4; transform: rotate(-17deg) translateX(-12px); }
+.inspiration-market-art i:nth-child(2) { background: #edcf9e; transform: rotate(17deg) translateX(12px); }
+.inspiration-market-art i:nth-child(3) { background: #dcebf6; transform: none; }
+.inspiration-market-art svg { position: relative; }
+.inspiration-market-entry strong { display: block; font-size: 14px; font-weight: 600; line-height: 1.6; }
+.inspiration-market-entry small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.inspiration-market-action { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; color: var(--blue-strong); font-size: 12px; }
+@container studio (max-width: 600px) { .inspiration-market-entry { gap: 12px; padding: 16px; } .inspiration-market-art { flex-basis: 44px; } .inspiration-market-action { font-size: 0; gap: 0; } }
+@container studio (max-width: 360px) { .inspiration-market-entry { gap: 10px; padding: 12px; } .inspiration-market-entry strong { font-size: 13px; } .inspiration-market-entry small { font-size: 10px; } }

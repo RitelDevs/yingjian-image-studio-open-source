@@ -1,0 +1,3 @@
+:root { --page-duration: 250ms; --page-fade-duration: 125ms; }
+/* Live panels remain interactive; navigation only animates transform and opacity. */
+.workspace-stage, .image-editor { transform-origin: center; }

@@ -1,0 +1,19 @@
+.thread-row-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 0; }
+.thread-rename-trigger { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); opacity: 0; }
+.thread-row-actions .thread-trash-trigger { flex-basis: 30px; width: 30px; }
+.thread-row:hover .thread-rename-trigger, .thread-row.selected .thread-rename-trigger, .thread-rename-trigger:focus-visible { opacity: 1; }
+.thread-rename-dialog { width: min(440px, calc(100vw - 32px)); max-width: none; margin: auto; padding: 28px; border: 1px solid #ffffffd9; border-radius: 24px; background: #f1f7fc; color: #203449; box-shadow: 0 24px 90px #18344e40; }
+.thread-rename-dialog::backdrop { background: #17365066; }
+.thread-rename-close { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: #ffffff80; color: #53697b; }
+.thread-rename-symbol { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border: 1px solid #b0d0e9; border-radius: 15px; background: #ddecfa; color: #2066b0; }
+.thread-rename-dialog h2 { margin: 0 0 20px; font-size: 22px; font-weight: 650; }
+.thread-rename-dialog label { display: block; margin-bottom: 8px; font-size: 13px; }
+.thread-rename-dialog input { display: block; width: 100%; height: 46px; padding: 0 12px; border: 1px solid #b4cde0; border-radius: 11px; background: #fff; color: #202428; font-size: 16px; }
+#thread-name-hint { display: flex; justify-content: space-between; gap: 10px; margin-top: 9px; color: #53697b; font-size: 11px; }
+.thread-rename-error { margin: 14px 0 0; color: #a43e30; font-size: 13px; line-height: 1.7; }
+.thread-rename-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.thread-rename-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 94px; min-height: 42px; padding: 9px 16px; border: 1px solid #bdcedc; border-radius: 12px; background: #fff; color: #203449; font-size: 13px; font-weight: 500; }
+.thread-rename-actions .thread-rename-save { border-color: #1d60a4; background: #2066b0; color: #fff; }
+@media (hover: hover) and (pointer: fine) { .thread-rename-trigger:hover { background: #2066b012; color: #2066b0; } }
+@media (max-width: 700px), (hover: none) { .thread-row-actions .thread-trash-trigger, .thread-rename-trigger { flex-basis: 40px; width: 40px; height: 44px; opacity: 1; } }
+@media (max-width: 420px) { .thread-rename-dialog { padding: 24px 20px; border-radius: 20px; } .thread-rename-actions button { flex: 1; min-height: 44px; } }

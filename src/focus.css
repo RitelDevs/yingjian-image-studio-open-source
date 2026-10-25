@@ -1,0 +1,29 @@
+/* Central focus styling: selection colors do not double as input-focus rings. */
+:root { --focus-outline: #576675; --focus-field-edge: #a7b5c2; }
+
+/* Pointer and programmatic focus keep the caret and normal field border, without a detached ring. */
+html[data-focus-origin="pointer"] :is(button, a, input, textarea, select, [tabindex], [contenteditable="true"]):focus {
+  outline: 0;
+}
+
+/* Keyboard navigation keeps one deliberate, neutral outline on the actual control. */
+html:not([data-focus-origin="pointer"]) :is(button, a, input, textarea, select, [tabindex], [contenteditable="true"]):focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 3px;
+}
+html:not([data-focus-origin="pointer"]) :is(.composer textarea, .ed-chat-input textarea, .style-search input, .market-filter-search input, .cip-search input, .picker-option):focus-visible {
+  outline-offset: -2px;
+}
+
+/* Composite inputs used to add a second blue border/glow around the focused child. */
+html[data-focus-origin] :is(.composer, .ed-chat-input, .style-search, .market-filter-search, .cip-search):focus-within {
+  outline: 0;
+  box-shadow: none;
+  border-color: var(--focus-field-edge);
+}
+html[data-focus-origin] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus:not([aria-invalid="true"]) {
+  border-color: var(--focus-field-edge);
+}
+@media (forced-colors: active) {
+  html:not([data-focus-origin="pointer"]) :is(button, a, input, textarea, select, [tabindex], [contenteditable="true"]):focus-visible { outline-color: Highlight; }
+}

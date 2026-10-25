@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 720" fill="none">
+  <path fill="#dbeef9" d="M0 0h600v720H0z"/>
+  <path d="M35 35h530v650H35z" stroke="#6597b0" stroke-opacity=".4"/>
+  <path d="M35 590h530M180 35v555M420 590v95" stroke="#6597b0" stroke-opacity=".4"/>
+  <text x="65" y="94" fill="#225d83" font-family="Arial,sans-serif" font-size="17" letter-spacing="2">FORM &amp; COLOUR</text>
+  <text x="485" y="94" fill="#225d83" font-family="Arial,sans-serif" font-size="17">01</text>
+  <g fill="#e79875"><ellipse cx="316" cy="315" rx="52" ry="153"/><ellipse cx="316" cy="315" rx="52" ry="153" transform="rotate(60 316 315)"/><ellipse cx="316" cy="315" rx="52" ry="153" transform="rotate(120 316 315)"/></g>
+  <circle cx="316" cy="315" r="51" fill="#faf1d6"/>
+  <circle cx="316" cy="315" r="17" fill="#275f80"/>
+  <path d="M55 405h82v82H55z" fill="#85b8d4"/><circle cx="96" cy="446" r="26" stroke="#eff7f9" stroke-width="2"/>
+  <path d="M488 176h39m-19-20v39" stroke="#376c8d" stroke-width="2"/>
+  <text x="61" y="558" fill="#224e6c" font-family="Arial,sans-serif" font-size="63" font-weight="700" letter-spacing="-2">BLOOM.</text>
+  <text x="65" y="628" fill="#376b8a" font-family="Arial,sans-serif" font-size="13">A STUDY IN SIMPLE THINGS</text>
+  <text x="65" y="655" fill="#376b8a" font-family="Arial,sans-serif" font-size="11">SHAPES / LIGHT / IMAGINATION</text>
+  <path d="M462 637h60m-18-18 18 18-18 18" stroke="#376b8a" stroke-width="2"/>
+</svg>

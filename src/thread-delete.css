@@ -1,0 +1,17 @@
+.thread-trash-trigger { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); opacity: 0; }
+.thread-row:hover .thread-trash-trigger, .thread-row.selected .thread-trash-trigger, .thread-trash-trigger:focus-visible { opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .thread-trash-trigger:hover { background: #b14b3814; color: #a43e30; } }
+.thread-delete-dialog { width: min(440px, calc(100vw - 32px)); max-width: none; margin: auto; padding: 28px; border: 1px solid #ffffffd9; border-radius: 24px; background: #f1f7fc; color: #203449; box-shadow: 0 24px 90px #18344e40; }
+.thread-delete-dialog::backdrop { background: #17365066; }
+.thread-delete-close { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: #ffffff80; color: #53697b; }
+.thread-delete-symbol { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border: 1px solid #e8b7ad; border-radius: 15px; background: #fae8e2; color: #a43e30; }
+.thread-delete-dialog h2 { margin: 0 0 14px; font-size: 22px; font-weight: 650; }
+.thread-delete-name { margin: 0 0 10px; padding: 10px 12px; border: 1px solid #cddfea; border-radius: 10px; background: #ffffffa6; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; max-height: 120px; overflow-y: auto; }
+#thread-delete-description { margin: 0; color: #53697b; font-size: 13px; line-height: 1.8; }
+.thread-delete-error { margin: 14px 0 0; color: #a43e30; font-size: 13px; line-height: 1.7; }
+.thread-delete-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.thread-delete-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 94px; min-height: 42px; padding: 9px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; }
+.thread-delete-cancel { border: 1px solid #bdcedc; background: #fff; color: #203449; }
+.thread-delete-confirm { border: 1px solid #9e3d31; background: #ab4739; color: #fff; }
+@media (max-width: 700px), (hover: none) { .thread-trash-trigger { flex-basis: 40px; width: 40px; height: 44px; opacity: 1; } }
+@media (max-width: 420px) { .thread-delete-dialog { padding: 24px 20px; border-radius: 20px; } .thread-delete-actions button { flex: 1; min-height: 44px; } }
