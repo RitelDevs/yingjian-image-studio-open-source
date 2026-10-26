@@ -27,6 +27,7 @@ import { getStyleExample } from '../shared/style-examples.mjs';
 import ImageEditor from './editor-ui/ImageEditor.jsx';
 
 const CONTACT = 'panrui12';
+const REGISTER_URL = 'https://api-us.ritelt.com/register?aff=885EB5776PEU';
 const SIZE_OPTIONS = ['1K', '2K', '4K'];
 const statusText = {
   queued: '排队中', running: '生成中', done: '已完成', partial: '部分完成',
@@ -152,7 +153,7 @@ function Login({ onLogin, demo, integration, embedded = false }) {
             </button>
           </form>
           {demo && <button className="demo-button" type="button" onClick={preview} disabled={busy}>进入本地预览</button>}
-          <div className="login-help"><span>注册账户请联系管理员微信 <strong>{CONTACT}</strong></span></div>
+          <div className="login-help"><a className="login-register-link" href={REGISTER_URL} target="_blank" rel="noopener noreferrer">注册账户<ArrowUpRight size={16} aria-hidden="true" /></a></div>
         </div>
       </section>
       <aside className="login-preview" aria-hidden="true">
