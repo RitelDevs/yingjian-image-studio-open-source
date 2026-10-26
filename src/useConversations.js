@@ -311,10 +311,10 @@ export function useConversations({ call, userId, defaultGroupId, fileToDataUrl }
       const latest = existing && (existing.updatedAt > job.updatedAt || existing.proposal?.state === 'confirmed' || existing.proposal?.state === 'superseded') ? existing : job;
       const messages = (current.messages || []).filter(item => item.id !== job.id);
       const updates = { messages: [...messages, latest].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)), loading: false, error: '' };
-      // Only consume the captured references if that same draft still exists. Keep normal chat text.
-      if (!input.styleSelectionId && current.draft.requestId === snapshot.requestId) {
+      // Accepted input now lives in the message. Never erase edits made while the request was in flight.
+      if (current.draft.requestId === snapshot.requestId) {
         releaseRefs(snapshot.refs);
-        updates.draft = { ...current.draft, refs: [], contextParentId: undefined, stylePlanRequest: undefined, requestId: crypto.randomUUID() };
+        updates.draft = { ...current.draft, ...(input.styleSelectionId ? { prompt: '' } : {}), refs: [], contextParentId: undefined, stylePlanRequest: undefined, requestId: crypto.randomUUID() };
       }
       patch(threadId, updates);
       // Read server ordering before exposing success; a delayed response must not supersede a newer plan.

@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {VERSION} from '../shared/version.mjs';
 import {normalizeSSOSources,createSSO} from '../server/sso.mjs';
 import {bridgeHtml} from '../server/sso-bridge.mjs';
-test('package and public API version stay aligned',()=>{assert.equal(JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version,VERSION);assert.equal(VERSION,'1.5.1');});
+test('package and public API version stay aligned',()=>{assert.equal(JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version,VERSION);assert.equal(VERSION,'1.5.2');});
 test('SSO sources are explicit canonical HTTPS origins',()=>{
  const sources=[{id:'gateway',name:'自有中转',origin:'https://gateway.example.com'}];assert.deepEqual(normalizeSSOSources(sources),sources);
  for(const origin of ['http://gateway.example.com','https://gateway.example.com/','https://gateway.example.com/path','https://user:pass@gateway.example.com','javascript:alert(1)'])assert.throws(()=>normalizeSSOSources([{...sources[0],origin}]));

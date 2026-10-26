@@ -19,6 +19,7 @@ import OptionPicker from './OptionPicker.jsx';
 import ProposalCard from './ProposalCard.jsx';
 import StyleMarket from './StyleMarket.jsx';
 import StyleOptimization from './StyleOptimization.jsx';
+import ImageViewer from './ImageViewer.jsx';
 import TurnstileVerification from './TurnstileVerification.jsx';
 import { imageSettingsForRetry, draftAspectRatio } from '../shared/image-geometry.mjs';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
@@ -207,16 +208,17 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
   return <article className="conversation-turn">
     <div className="turn-meta"><div className="turn-avatar">你</div><strong>你</strong><time>{new Date(item.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time></div>
     <div className="prompt-text">{item.prompt}</div>
+    {chat && (item.proposal?.style || item.context?.styleOptimization?.style) && <div className="turn-style-settings"><Layers3 size={12} /><span>{(item.proposal?.style || item.context.styleOptimization.style).name}</span><span>·</span><span>{item.proposal?.optimization?.mode === 'professional' || item.context?.styleOptimization ? '专业优化' : '直接套用'}</span></div>}
     {item.context?.turnIds?.length > 0 && <div className="turn-settings">已参考前 {item.context.turnIds.length} 轮要求{item.context.imageId ? '及上一轮图片' : ''}</div>}
     {item.aspectRatio && item.aspectRatio !== 'auto' && <div className="turn-settings">{item.size} · {item.aspectRatio}</div>}
-    {item.referenceIds?.length > 0 && <div className="reference-strip">{item.referenceIds.map((id, index) => <div className="reference-image-item" key={id}><img src={`/api/media/${id}`} alt={`参考图 ${index + 1}`} /><button className="reference-to-editor" title="放入工作台" aria-label={`将参考图 ${index + 1} 放入工作台`} onClick={() => onEditImage({ id, url: `/api/media/${id}`, name: `参考图-${index + 1}` })}>放入工作台</button></div>)}</div>}
+    {item.referenceIds?.length > 0 && <div className="reference-strip">{item.referenceIds.map((id, index) => <div className="reference-image-item" key={id}><button type="button" className="reference-image-open" title="查看参考图大图" aria-label={`查看参考图 ${index + 1} 大图`} onClick={() => onOpenImage({ id, url: `/api/media/${id}`, threadId: item.threadId, name: `参考图-${index + 1}` })}><img src={`/api/media/${id}`} alt={`参考图 ${index + 1}`} /></button><button className="reference-to-editor" title="放入工作台" aria-label={`将参考图 ${index + 1} 放入工作台`} onClick={() => onEditImage({ id, url: `/api/media/${id}`, name: `参考图-${index + 1}` })}>放入工作台</button></div>)}</div>}
     <div className="response-block">
       <div className="response-heading"><span className="result-symbol"><Sparkles size={17} /></span><strong>映间</strong><span className={`status status-${item.status}`}>{pending && <LoaderCircle className="spin" size={13} />}{chat && item.recovery === 'style_template' ? '方案未整理成功' : chat ? ({ queued: '等待回复', running: '正在思考', done: '已回复', unknown: '回复待核对', failed: '回复失败' }[item.status] || item.status) : statusText[item.status] || item.status}</span></div>
       {pending && <div className="progress-line"><span />{chat ? (item.status === 'queued' ? '正在等待前一轮完成…' : item.context?.styleOptimization ? '正在按专业规则推敲构图、光影与表现方式…' : '正在理解需求、整理回复…') : item.status === 'queued' ? '正在排队，空出位置后会自动开始，无需重复提交。' : '正在生成图片'}</div>}
       {chat && item.assistantText && <p className="assistant-reply">{item.assistantText}</p>}
       {chat && item.proposal && <ProposalCard item={item} groupName={groupName} confirming={confirming} blocked={blocked} onConfirm={onConfirm} />}
       {item.images?.length > 0 && <div className={`image-grid ${item.images.length === 1 ? 'single-image' : ''}`}>{item.images.map((image, index) => <div className="image-item" key={image.id}>
-        <button className="image-open" onClick={() => onOpenImage(image.url)} title="查看大图" aria-label={`查看生成结果 ${index + 1}`}><img src={image.url} alt={`生成结果 ${index + 1}`} loading="lazy" /></button>
+        <button className="image-open" onClick={() => onOpenImage({ ...image, threadId: item.threadId, name: `生成作品-${index + 1}` })} title="查看大图" aria-label={`查看生成结果 ${index + 1}`}><img src={image.url} alt={`生成结果 ${index + 1}`} loading="lazy" /></button>
         <div className="image-actions"><button className="image-to-editor" title="放入工作台" aria-label="放入工作台" onClick={() => onEditImage({ ...image, name: `生成作品-${index + 1}` })}><SlidersHorizontal size={17} /><span>放入工作台</span></button><button title="基于这张图继续修改" aria-label="基于这张图继续修改" onClick={() => onUseImage({ ...image, sourceMessageId: item.id })}><ImagePlus size={17} /></button><a href={image.url} download={`yingjian-${image.id}.${image.mime === 'image/png' ? 'png' : image.mime === 'image/webp' ? 'webp' : 'jpg'}`} title="下载图片" aria-label="下载图片"><ArrowDownToLine size={17} /></a></div>
       </div>)}</div>}
       {item.error && <p className={`response-note ${item.status === 'failed' || item.status === 'unknown' ? 'response-error' : ''}`}>{item.error}</p>}
@@ -413,8 +415,7 @@ function Workspace({ initial, onLogout }) {
           </div>
           {chosenStyle && <p className="composer-style-hint">{chosenStyle.inputMode === 'reference' ? '上传参考图，发送后查看方案；点 × 取消风格。' : '只写想画的内容即可；点 × 取消内置风格。'}</p>}
           {chosenStyle && prompt.trim().length > 1200 && <p className="composer-style-error" role="status">已有文字已保留。使用风格时最多 1200 字，可缩短内容或移除标签。</p>}
-          {chosenStyle && initial.features?.styleOptimization && <StyleOptimization style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}
-          <ImageGeometry draft={draft} onChange={editDraft} />
+          <ImageGeometry draft={draft} onChange={editDraft}>{chosenStyle && initial.features?.styleOptimization && <StyleOptimization compact style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}</ImageGeometry>
           <div className="composer-toolbar"><div className="composer-options"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { addFiles(event.target.files || []); event.target.value = ''; }} /><button className="tool-button" onClick={() => fileInput.current?.click()} title="添加参考图片，也可将图片拖入输入框" aria-label="添加参考图片" disabled={refs.length >= 4}><Paperclip size={18} /></button><span className="toolbar-divider" /><OptionPicker label="尺寸" className="size-select" value={size} options={SIZE_OPTIONS.map(item => ({ value: item, label: item }))} onChange={size => editDraft({ size })} /><div className="count-control" title="每次生成张数"><button aria-label="减少张数" onClick={() => editDraft({ count: Math.max(1, count - 1) })} disabled={count <= 1}>−</button><span>{count} 张</span><button aria-label="增加张数" onClick={() => editDraft({ count: Math.min(4, count + 1) })} disabled={count >= 4}>+</button></div><OptionPicker label="分组" className="group-select" value={groupId} options={groups.map(item => ({ value: item.id, label: item.name }))} onChange={groupId => editDraft({ groupId })} /></div><button className="send-button" onClick={submitComposer} disabled={!canSubmit} title={chosenStyle ? '发送并查看风格方案' : '发送对话'} aria-label={chosenStyle ? '发送风格描述' : '发送对话'}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}<span>发送</span></button></div>
         </div>
         <div className="composer-bottom"><span className="composer-hint">Enter 发送 · Shift + Enter 换行</span><span>对话与生图均按中转计费 · 生图需确认</span></div>
@@ -423,7 +424,7 @@ function Workspace({ initial, onLogout }) {
       </div>
     </div>
     {editorVisited && <ImageEditor key={user.id} user={user} groups={groups} defaultGroupId={groupId} demo={initial.demo} active={editorOpen} source={editorSource} onBack={closeEditor} onReturnReference={returnEditorReference} />}
-    {detailImage && <div className="lightbox" onClick={() => setDetailImage(null)}><button className="icon-button" aria-label="关闭大图" title="关闭大图"><X /></button><img src={detailImage} alt="生成图片大图" /></div>}
+    {detailImage && <ImageViewer image={detailImage} onClose={() => setDetailImage(null)} onEdit={image => { setDetailImage(null); openEditor(image); }} />}
   </div>;
 }
 

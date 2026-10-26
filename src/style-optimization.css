@@ -13,3 +13,22 @@
 .style-optimization-summary li { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; margin: 8px 0; overflow-wrap: anywhere; }
 .style-optimization-summary p { margin: 10px 0 0; color: var(--muted, #526679); font-size: 11px; overflow-wrap: anywhere; }
 @media (max-width: 560px) { .style-optimization-options { gap: 8px; } .style-optimization-options label { flex-basis: 100%; } .style-optimization-summary li { grid-template-columns: 64px minmax(0, 1fr); } }
+
+/* The composer keeps only two compact choices beside the aspect-ratio control. */
+.style-optimization.is-compact { flex:0 0 auto; margin:0; padding:0; border:0; border-radius:0; background:transparent; }
+.style-optimization.is-compact .style-optimization-options { display:inline-flex; flex-wrap:nowrap; gap:3px; padding:2px; border:1px solid #a6bfd22e; border-radius:10px; background:#e3edf45c; }
+.style-optimization.is-compact .style-optimization-options label { position:relative; display:flex; flex:0 0 auto; gap:5px; align-items:center; min-height:28px; padding:3px 8px; border:1px solid transparent; border-radius:7px; color:var(--muted); }
+.style-optimization.is-compact .style-optimization-options label:has(input:checked) { color:var(--ink); border-color:#ffffffc9; background:#ffffffbf; box-shadow:0 1px 3px #25405b0a; }
+.style-optimization.is-compact .style-optimization-options input { width:12px; height:12px; margin:0; }
+.style-optimization.is-compact .style-optimization-options strong { font-size:11px; font-weight:500; line-height:1.4; white-space:nowrap; }
+.composer .geometry-fields { gap:8px 14px; }
+.composer .composer-style-hint { display:none; }
+.turn-style-settings { display:flex; align-items:center; gap:6px; margin:8px 0 0; color:var(--muted); font-size:11px; }
+.reference-image-open { display:block; padding:0; border:0; border-radius:10px; background:transparent; overflow:hidden; cursor:zoom-in; }
+@media (max-width:560px) {
+ .composer .geometry-fields { column-gap:6px; }
+ .composer .geometry-fields .ratio-select .picker-trigger { gap:5px; }
+ .style-optimization.is-compact .style-optimization-options { gap:0; }
+ .style-optimization.is-compact .style-optimization-options label { flex-basis:auto; padding-inline:6px; gap:4px; }
+ .style-optimization.is-compact .style-optimization-options strong { font-size:10px; }
+}

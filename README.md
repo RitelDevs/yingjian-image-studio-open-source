@@ -56,7 +56,7 @@ npm run build:published
 npm run release:package
 ```
 
-构建全部在本地完成。`release/v1.5.0/` 生成允许公开的源码目录、部署目录、两个压缩包与 SHA-256 清单。服务器只接收编译产物，运行 Node.js 或通用 Compose 模板。
+构建全部在本地完成。`release/v1.5.2/` 生成允许公开的源码目录、部署目录、两个压缩包与 SHA-256 清单。服务器只接收编译产物，运行 Node.js 或通用 Compose 模板。
 
 - 部署入口：[deploy/README.md](deploy/README.md)
 - 1.5 验收与上线步骤：[docs/RELEASE_1.5.md](docs/RELEASE_1.5.md)

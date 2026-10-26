@@ -11,7 +11,7 @@ const ratioOptions = [
   { value: 'custom', label: '自定义', icon: <SlidersHorizontal size={20} /> }
 ];
 
-export default function ImageGeometry({ draft, onChange }) {
+export default function ImageGeometry({ draft, onChange, children }) {
   let geometry, error;
   try { geometry = resolveImageGeometry(draft.size, draftAspectRatio(draft)); }
   catch (issue) { error = issue.message; }
@@ -19,6 +19,7 @@ export default function ImageGeometry({ draft, onChange }) {
   return <div className="geometry-controls">
     <div className="geometry-fields">
       <OptionPicker label="画面比例" className="ratio-select" value={draft.aspectRatio || 'auto'} options={ratioOptions} grid onChange={aspectRatio => onChange({ aspectRatio })} />
+      {children}
       {custom && <div className="custom-ratio" role="group" aria-label="自定义宽高比">
         <label><span>宽</span><input aria-label="比例宽" aria-invalid={Boolean(error)} aria-describedby={error ? 'ratio-help ratio-error' : 'ratio-help'} type="number" min="1" max="10000" step="1" inputMode="numeric" value={draft.ratioWidth} onChange={event => onChange({ ratioWidth: event.target.value })} /></label>
         <span aria-hidden="true">:</span>
