@@ -24,8 +24,17 @@ const mapping = {
 };
 export function getStyleOptimizationProfile(style) {
   const id = typeof style === 'string' ? style : style?.id;
-  const kind = mapping[id] || (style?.category === '商品' || style?.category === '摄影' ? 'photography'
+  const kind = mapping[id] || (style?.category === '产品' || style?.category === '摄影' ? 'photography'
     : style?.category === '海报' ? 'editorial' : style?.category === '科研' || style?.category === '信息图' ? 'diagram'
     : style?.category === '漫画' ? 'narrative' : style?.category === '角色' ? 'character' : 'illustration');
   return { id: kind, ...profiles[kind], version: STYLE_OPTIMIZATION_VERSION };
+}
+
+// Render the narrow v1.5.0 validation failure as a known planning failure without rewriting history.
+export function styleOptimizationFailureView(status, error, context) {
+  if (!context?.styleOptimization || !['unknown', 'failed'].includes(status)) return { status, error };
+  const known = context.styleOptimizationFailure?.reason === 'invalid_style_optimization';
+  const legacy = typeof error === 'string' && /^(专业优化返回格式不完整|专业优化未按方案格式返回|专业优化未返回有效说明|专业优化缺少具体处理建议|专业优化建议格式或长度无效|专业优化后的方案过长)/.test(error);
+  if (!known && !legacy) return { status, error };
+  return { status: 'failed', recovery: 'style_template', error: known ? error : '专业优化已返回，但建议未通过格式或长度校验，尚未提交生图。可切换为“直接套用”准备方案，不再请求优化模型；本次优化是否扣费以上游账单为准，异常扣费请联系管理员微信 panrui12 核对。' };
 }

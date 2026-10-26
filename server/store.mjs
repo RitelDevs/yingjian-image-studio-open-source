@@ -1,3 +1,4 @@
+import { styleOptimizationFailureView } from '../shared/style-optimization.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
@@ -166,6 +167,7 @@ export function createStore(directory) {
       context,
       error: message.error, referenceIds: JSON.parse(message.reference_ids),
       images: mediaRows.filter((item) => item.kind === 'output').map((item) => ({ id: item.id, mime: item.mime, url: `/api/media/${item.id}` })),
+      ...styleOptimizationFailureView(message.status, message.error, context),
       createdAt: message.created_at, updatedAt: message.updated_at
     };
   }

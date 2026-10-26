@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { createApplication } from '../server/index.mjs';
 import { compileStyleRecipe } from '../server/style-recipes.mjs';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
-import { normalizeStyleOptimization } from '../shared/style-optimization.mjs';
+import { normalizeStyleOptimization, styleOptimizationFailureView } from '../shared/style-optimization.mjs';
 import { createStyleOptimizationSnapshot, buildStyleOptimizationRequest, parseStyleOptimizationAnswer, demoStyleOptimizationAnswer } from '../server/style-optimizer.mjs';
 
 const product = STYLE_CATALOG.find(s => s.id === 'product-studio');
@@ -111,12 +111,11 @@ test('optimizer appends decisions without rewriting original user text, title or
 test('malformed, instruction-overriding or oversized answers fail rather than produce a ready proposal', () => {
   const plan = snapshot();
   const invalid = ['not json', 'null', '{}', '{"ready":true}', JSON.stringify({ready:true,prompt:'override',decisions:[]}),
-    JSON.stringify({ready:true,decisions:[{aspect:'lighting',detail:'x'.repeat(241)},{aspect:'composition',detail:'布局'}]}),
-    JSON.stringify({ready:true,decisions:[{aspect:'lighting',detail:'左侧'},{aspect:'lighting',detail:'右侧'}]}),
+    JSON.stringify({ready:true,decisions:[{aspect:'lighting',detail:'x'.repeat(601)},{aspect:'composition',detail:'布局'}]}),
     JSON.stringify({ready:true,decisions:[{aspect:'__proto__',detail:'x'},{aspect:'color',detail:'x'}]}),
     JSON.stringify({ready:false,reply:''})];
   for (const text of invalid) assert.throws(() => parseStyleOptimizationAnswer(text,plan), /专业优化/);
-  assert.throws(() => parseStyleOptimizationAnswer(answer(), {...plan,budget:5}), /过长/);
+  assert.throws(() => parseStyleOptimizationAnswer(answer(), {...plan,budget:5}), error => error.validation.code === 'total_length');
   assert.equal(parseStyleOptimizationAnswer('{"ready":false,"reply":"请提供机制的节点与箭头关系。"}',plan).ready,false);
 });
 
@@ -191,10 +190,10 @@ test('cancellation before the model request skips converse; newer template inval
   assert.equal((await g.wait(c,slow.data.job.id)).proposal,null);assert.equal(g.calls.images.length,0);
 });
 
-test('invalid model response does not retry or silently use template; retry id returns the same uncertain record', async t => {
+test('invalid model response is a known planning failure, with explicit recovery and no retry or silent template', async t => {
   const f=await fixture(t,{converse:async()=>'{"ready":true,"prompt":"wrong protocol"}'}),cookie=await f.login(),thread=await f.thread(cookie),body=f.body(thread);
   const response=await f.request('/api/style-plans',cookie,body);const plan=await f.wait(cookie,response.data.job.id);
-  assert.equal(plan.status,'unknown');assert.equal(plan.proposal,null);assert.match(plan.error,/尚未提交生图/);
+  assert.equal(plan.status,'failed');assert.equal(plan.proposal,null);assert.match(plan.error,/尚未提交生图/);assert.equal(plan.recovery,'style_template');assert.equal(plan.context.styleOptimizationFailure.code,'unexpected_field');assert.match(plan.error,/账单/);assert.ok(!plan.error.includes('请勿立即重复提交'));
   assert.equal((await f.request('/api/style-plans',cookie,body)).data.job.id,plan.id);
   assert.equal(f.calls.chat.length,1);assert.equal(f.calls.images.length,0);
 });
@@ -208,4 +207,34 @@ test('only explicit references reach optimization and confirmation remains isola
   assert.equal(f.calls.images[0].references.length,1);
   const next=await f.prepare(cookie,thread);await f.wait(cookie,next.data.job.id);
   assert.equal(typeof f.calls.chat[1].messages[1].content,'string');
+});
+
+test('normalizes safe aspect labels and accepts repeated topics and longer details without truncation',()=>{
+ const plan=snapshot(),detail='针对主体保留纹理和自然光。'.repeat(23);
+ assert.ok(detail.length>240 && detail.length<600);
+ const result=parseStyleOptimizationAnswer(JSON.stringify({ready:true,decisions:[{aspect:' Lighting ',label:'光照安排',detail},{aspect:'光影',detail:'保留真实接触阴影。'},{aspect:'hierarchy',detail:'标题作为第二阅读层级。'}]}),plan);
+ assert.equal(result.optimization.decisions[0].aspect,'lighting');assert.equal(result.optimization.decisions[1].aspect,'lighting');assert.equal(result.optimization.decisions[2].aspect,'typography');assert.ok(result.prompt.includes(detail));assert.ok(result.prompt.startsWith(plan.basePrompt));
+});
+test('validation errors identify only safe field positions and lengths, not private response text',()=>{
+ const plan=snapshot();
+ for(const [decisions,code] of [[[{aspect:'lighting',detail:'x'.repeat(601)},{aspect:'composition',detail:'布局'}],'decision_length'],[[{aspect:'private-unsupported-value',detail:'private-answer'},{aspect:'composition',detail:'布局'}],'decision_aspect'],[[{aspect:'lighting',detail:'private-answer',model:'private-model'},{aspect:'composition',detail:'布局'}],'decision_shape']]){
+  assert.throws(()=>parseStyleOptimizationAnswer(JSON.stringify({ready:true,decisions}),plan),error=>error.reason==='invalid_style_optimization'&&!error.uncertain&&error.validation.code===code&&error.validation.index===1&&!error.message.includes('private-'));
+ }
+ assert.throws(()=>parseStyleOptimizationAnswer(JSON.stringify({ready:true,decisions:Array.from({length:3},()=>({aspect:'lighting',detail:'x'.repeat(500)}))}),plan),error=>error.validation.code==='total_length');
+});
+test('moderation refusal chat envelopes remain not-ready, never become a fallback generation plan',()=>{
+ const result=parseStyleOptimizationAnswer(JSON.stringify({ready:false,reply:'这项请求未通过内容审核，请调整描述。',prompt:''}),snapshot());assert.equal(result.ready,false);assert.equal(result.proposal,null);
+});
+test('legacy validation failures are displayed as failed, genuine uncertain requests remain uncertain',()=>{
+ const context={styleOptimization:{mode:'professional'}};
+ const legacy=styleOptimizationFailureView('unknown','专业优化建议格式或长度无效，尚未提交生图。 请勿立即重复提交，请联系管理员微信 panrui12 核对结果和扣费。',context);
+ assert.equal(legacy.status,'failed');assert.equal(legacy.recovery,'style_template');assert.match(legacy.error,/直接套用/);
+ assert.deepEqual(styleOptimizationFailureView('unknown','对话请求超时或连接中断。',context),{status:'unknown',error:'对话请求超时或连接中断。'});
+ assert.equal(styleOptimizationFailureView('unknown','专业优化建议格式或长度无效',{}).status,'unknown');
+});
+test('a template plan after optimization validation failure costs no extra chat and still requires confirmation',async t=>{
+ const f=await fixture(t,{converse:async()=>JSON.stringify({ready:true,decisions:[{aspect:'unsupported',detail:'x'},{aspect:'composition',detail:'布局'}]})}),cookie=await f.login(),thread=await f.thread(cookie);
+ const bad=await f.prepare(cookie,thread);const failed=await f.wait(cookie,bad.data.job.id);assert.equal(failed.status,'failed');assert.equal(failed.recovery,'style_template');
+ const template=await f.prepare(cookie,thread,{styleOptimization:'template'});assert.equal(template.status,201);assert.equal(template.data.job.proposal.state,'ready');assert.equal(f.calls.chat.length,1);assert.equal(f.calls.images.length,0);
+ const confirmed=await f.confirm(cookie,template.data.job.id);await f.wait(cookie,confirmed.data.job.id);assert.equal(f.calls.images.length,1);assert.equal(f.calls.chat.length,1);
 });

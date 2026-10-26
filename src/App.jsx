@@ -201,7 +201,7 @@ function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLo
   </>;
 }
 
-function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, onConfirm, confirming, blocked, groupName }) {
+function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, onConfirm, onUseTemplate, confirming, blocked, groupName }) {
   const chat = item.kind === 'chat';
   const pending = item.status === 'queued' || item.status === 'running';
   return <article className="conversation-turn">
@@ -211,7 +211,7 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
     {item.aspectRatio && item.aspectRatio !== 'auto' && <div className="turn-settings">{item.size} · {item.aspectRatio}</div>}
     {item.referenceIds?.length > 0 && <div className="reference-strip">{item.referenceIds.map((id, index) => <div className="reference-image-item" key={id}><img src={`/api/media/${id}`} alt={`参考图 ${index + 1}`} /><button className="reference-to-editor" title="放入工作台" aria-label={`将参考图 ${index + 1} 放入工作台`} onClick={() => onEditImage({ id, url: `/api/media/${id}`, name: `参考图-${index + 1}` })}>放入工作台</button></div>)}</div>}
     <div className="response-block">
-      <div className="response-heading"><span className="result-symbol"><Sparkles size={17} /></span><strong>映间</strong><span className={`status status-${item.status}`}>{pending && <LoaderCircle className="spin" size={13} />}{chat ? ({ queued: '等待回复', running: '正在思考', done: '已回复', unknown: '回复待核对', failed: '回复失败' }[item.status] || item.status) : statusText[item.status] || item.status}</span></div>
+      <div className="response-heading"><span className="result-symbol"><Sparkles size={17} /></span><strong>映间</strong><span className={`status status-${item.status}`}>{pending && <LoaderCircle className="spin" size={13} />}{chat && item.recovery === 'style_template' ? '方案未整理成功' : chat ? ({ queued: '等待回复', running: '正在思考', done: '已回复', unknown: '回复待核对', failed: '回复失败' }[item.status] || item.status) : statusText[item.status] || item.status}</span></div>
       {pending && <div className="progress-line"><span />{chat ? (item.status === 'queued' ? '正在等待前一轮完成…' : item.context?.styleOptimization ? '正在按专业规则推敲构图、光影与表现方式…' : '正在理解需求、整理回复…') : item.status === 'queued' ? '正在排队，空出位置后会自动开始，无需重复提交。' : '正在生成图片'}</div>}
       {chat && item.assistantText && <p className="assistant-reply">{item.assistantText}</p>}
       {chat && item.proposal && <ProposalCard item={item} groupName={groupName} confirming={confirming} blocked={blocked} onConfirm={onConfirm} />}
@@ -220,6 +220,7 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
         <div className="image-actions"><button className="image-to-editor" title="放入工作台" aria-label="放入工作台" onClick={() => onEditImage({ ...image, name: `生成作品-${index + 1}` })}><SlidersHorizontal size={17} /><span>放入工作台</span></button><button title="基于这张图继续修改" aria-label="基于这张图继续修改" onClick={() => onUseImage({ ...image, sourceMessageId: item.id })}><ImagePlus size={17} /></button><a href={image.url} download={`yingjian-${image.id}.${image.mime === 'image/png' ? 'png' : image.mime === 'image/webp' ? 'webp' : 'jpg'}`} title="下载图片" aria-label="下载图片"><ArrowDownToLine size={17} /></a></div>
       </div>)}</div>}
       {item.error && <p className={`response-note ${item.status === 'failed' || item.status === 'unknown' ? 'response-error' : ''}`}>{item.error}</p>}
+      {chat && item.recovery === 'style_template' && onUseTemplate && <div className="response-tools"><button type="button" disabled={blocked} onClick={onUseTemplate}><Layers3 size={14} />切换为直接套用</button><span className="turn-settings">无需再次请求优化模型，确认方案后才生图</span></div>}
       {!chat && ['done', 'partial', 'failed'].includes(item.status) && <div className="response-tools"><button onClick={() => onRetry(item)}><RefreshCw size={14} /> 重新生成</button><button onClick={() => onCopy(item.prompt)}><Copy size={14} /> 复制提示词</button></div>}
     </div>
   </article>;
@@ -390,7 +391,7 @@ function Workspace({ initial, onLogout }) {
         <div className="conversation-inner">
           {loading && <div className="thread-load-state" role="status"><LoaderCircle className="spin" size={20} /><span>正在加载创作记录…</span></div>}
           {loadError && <div className="thread-load-error" role="status"><span>{loadError}</span><button onClick={reloadThread}>重新加载会话</button></div>}
-          {isEmpty ? <Inspiration onFocus={() => textInput.current?.focus({ preventScroll: true })} onUpload={() => fileInput.current?.click()} onOpenMarket={openMarket} /> : messages.map((item) => <Message key={item.id} item={item} onEditImage={openEditor} onUseImage={useImage} onRetry={retry} onCopy={copy} onOpenImage={setDetailImage} onConfirm={confirmPlan} confirming={Boolean(confirming[item.id])} blocked={sending || styleCancellationPending || messages.some(turn => turn.kind === 'chat' && ['queued', 'running'].includes(turn.status))} groupName={groups.find(group => group.id === item.groupId)?.name} />)}
+          {isEmpty ? <Inspiration onFocus={() => textInput.current?.focus({ preventScroll: true })} onUpload={() => fileInput.current?.click()} onOpenMarket={openMarket} /> : messages.map((item) => <Message key={item.id} item={item} onEditImage={openEditor} onUseImage={useImage} onRetry={retry} onCopy={copy} onOpenImage={setDetailImage} onConfirm={confirmPlan} onUseTemplate={chosenStyle?.id === item.context?.styleOptimization?.style?.id ? () => { const original = item.context.styleOptimization.styleInput; editDraft({ styleOptimization: 'template', ...(!prompt.trim() ? { prompt: original?.subject || item.prompt, styleTitle: original?.title || '' } : {}), ...(!refs.length && item.referenceIds?.length ? { refs: item.referenceIds.map((id, index) => ({ mediaId: id, objectUrl: `/api/media/${id}`, name: `参考图-${index + 1}` })) } : {}) }); setNotice('已切换为直接套用。点击“发送”整理方案，确认后才生图；不会再次请求专业优化模型。'); requestAnimationFrame(() => textInput.current?.focus({ preventScroll: true })); } : undefined} confirming={Boolean(confirming[item.id])} blocked={sending || styleCancellationPending || messages.some(turn => turn.kind === 'chat' && ['queued', 'running'].includes(turn.status))} groupName={groups.find(group => group.id === item.groupId)?.name} />)}
           <div ref={endRef} />
         </div>
       </main>

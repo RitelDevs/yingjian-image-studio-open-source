@@ -85,8 +85,12 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey = createK
       const unknown = !known || error.uncertain === true;
       let message = known ? error.message : chat ? '对话处理遇到异常，尚未提交生图。请稍后再试。' : '网站处理生图任务时遇到异常，暂时无法确认结果。请勿立即重复提交，请联系管理员微信 panrui12 核对。';
       if (unknown && !message.includes('panrui12')) message += ' 请勿立即重复提交，请联系管理员微信 panrui12 核对结果和扣费。';
+      if (known && error.reason === 'invalid_style_optimization') {
+        const current = store.contextJob(id);
+        if (current) store.setContext(id, { ...current.context, styleOptimizationFailure: { reason: error.reason, ...error.validation } });
+      }
       store.updateMessage(id, unknown ? 'unknown' : 'failed', message);
-      console.warn(JSON.stringify({ event: chat ? 'chat_turn_failed' : 'image_job_failed', jobId: id, reason: known ? error.reason : 'internal_error', status: known ? error.status : 500, uncertain: unknown, ...(error.networkCode ? { networkCode: error.networkCode } : {}) }));
+      console.warn(JSON.stringify({ event: chat ? 'chat_turn_failed' : 'image_job_failed', jobId: id, reason: known ? error.reason : 'internal_error', status: known ? error.status : 500, uncertain: unknown, ...(error.networkCode ? { networkCode: error.networkCode } : {}), ...(error.validation ? { validation: error.validation } : {}) }));
     } finally {
       active--;
       runningThreads.delete(job.threadId);
