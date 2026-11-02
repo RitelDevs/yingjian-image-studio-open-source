@@ -102,3 +102,12 @@ Turnstile 配置仍取自 Sub2API；本站转交单次验证证明，并区分�
 同时维护新旧生图域名时，设置 `PUBLIC_ORIGINS=https://images.example.com,https://legacy.example.com`，并在每个 `SSO_SOURCES` 条目加入 `studioOrigin` 指明该中转登录后返回哪个生图域名。`PUBLIC_ORIGIN` 必须包含在允许列表中。未填写 `studioOrigin` 的条目归属主域名。
 
 配置按请求 Host 选择来源列表；挑战和一次性票据绑定生图 Origin，不能拿旧域名的票据登录新域名。桥接页面也只允许所属生图 Origin 作为父页面。
+
+
+## 对话模型选择
+
+`CHAT_MODEL` 设置默认值；`CHAT_MODELS` 可用逗号配置站点对话模型白名单。默认提供 `gpt-6-luna` 和 `gpt-6.1-sol`，默认模型始终保留。它是站点允许提交的模型列表，实际可用性及价格由用户所选中转分组决定，不自动探测或发起收费请求。
+
+`/api/config`、`/api/me` 返回 `chatModels`。`POST /api/chat` 和 `POST /api/style-plans` 可传 `chatModel`，缺省沿用默认值，非白名单值在创建任务和调用模型前拒绝。普通对话任务model与专业优化snapshot.model均固定保存本次选择，修改选择不改变已提交任务和待确认方案；生图仍使用IMAGE_MODEL。直接套用不调用对话模型。
+
+输入区选择按用户和会话保存在当前浏览器sessionStorage。此入口用于创作对话和风格专业优化；编辑台的参数调整助手仍使用服务器默认模型。模型错误直接显示，不自动切换或重试其他模型。

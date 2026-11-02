@@ -1,3 +1,4 @@
+import { createChatModelSelection } from './chat-models.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
@@ -77,6 +78,8 @@ function buildApplication(options, sub2apiAccount) {
       ['handle', 'authenticate', 'authorizeSession', 'logout', 'close'].some(key => typeof sub2apiAccount[key] !== 'function'))) throw new Error('Invalid mixed Sub2API account configuration');
   const gateway = options.gateway || createGateway(process.env.GATEWAY_BASE_URL || 'http://127.0.0.1:8080', process.env.IMAGE_MODEL || 'gpt-image-2.5', demo);
   const chatModel = options.chatModel || process.env.CHAT_MODEL || 'gpt-6-luna';
+  const chatSelection = createChatModelSelection(chatModel, options.chatModels ?? (process.env.CHAT_MODELS ? process.env.CHAT_MODELS.split(',').map(value => value.trim()).filter(Boolean) : undefined));
+  const chatModels = chatSelection.models;
   const publicOrigin = options.publicOrigin ?? process.env.PUBLIC_ORIGIN ?? sub2apiAccount?.origin ?? '';
   const configuredOrigins = options.publicOrigins ?? (process.env.PUBLIC_ORIGINS ? process.env.PUBLIC_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : sub2apiAccount ? (sub2apiAccount.origins ?? [sub2apiAccount.origin]) : null);
   const publicOrigins = [...new Set(configuredOrigins || (publicOrigin ? [publicOrigin] : []))];
@@ -139,7 +142,7 @@ function buildApplication(options, sub2apiAccount) {
   }
   async function api(req, res, path) {
     if (path === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true, version: VERSION, ...(options.previewId ? { previewId: options.previewId } : {}), queue: { active: queue.active, waiting: queue.waiting, limit: queue.limit } });
-    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, chatModel, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
+    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, chatModel, chatModels, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
     if (sub2apiAccount && /^\/api\/(?:login(?:[/-]|$)|demo-login$|sso(?:[/-]|$))/.test(path)) throw new GatewayError('请使用账号中心登录。', 404);
     if (path === '/api/login-config' && req.method === 'GET') { requestPublicOrigin(req); return send(res, 200, await gateway.loginConfig()); }
     if (await sso.handle(req, res, path, { send, parseJson, sessionCookie: cookie })) return;
@@ -192,7 +195,7 @@ function buildApplication(options, sub2apiAccount) {
       checkTestAccount(user);
       store.updateSession(session, { user });
       const groups = groupList(await gateway.groups(session.accessToken, session.context));
-      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, chatModel, demo, integration, features: { styleOptimization: true }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
+      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, chatModel, chatModels, demo, integration, features: { styleOptimization: true }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
     }
     if (path === '/api/threads' && req.method === 'GET') return send(res, 200, { threads: store.threads(session.user_id) });
     if (path === '/api/threads' && req.method === 'POST') return send(res, 201, { thread: store.createThread(session.user_id) });
@@ -234,6 +237,7 @@ function buildApplication(options, sub2apiAccount) {
       if (integration) throw new GatewayError('管理员联调入口暂不提供风格方案，请使用本地预览或正式创作入口。', 403);
       const input = await parseJson(req);
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new GatewayError('风格方案内容无效。', 400);
+      const selectedChatModel = chatSelection.select(input.chatModel);
       let optimizationMode;
       try { optimizationMode = normalizeStyleOptimization(input.styleOptimization); }
       catch (error) { throw new GatewayError(error.message, 400); }
@@ -293,14 +297,14 @@ function buildApplication(options, sub2apiAccount) {
       });
       if (totalSize > 24 * 1024 * 1024) throw new GatewayError('参考图总量超过 24 MB。', 413);
       const optimizationSnapshot = optimizationMode === 'professional' ? createStyleOptimizationSnapshot({
-        compiled, subject: (input.subject ?? '').trim(), title: (input.title ?? '').trim(), model: chatModel, demo, styleSelectionId
+        compiled, subject: (input.subject ?? '').trim(), title: (input.title ?? '').trim(), model: selectedChatModel, demo, styleSelectionId
       }) : null;
       const context = { enabled: false, ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
       const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId };
       const subject = (input.subject ?? '').trim() || `参考图套用：${compiled.style.name}`, title = (input.title ?? '').trim();
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, thread.id, {
-          clientRequestId, prompt: subject + (title ? `\n标题：${title}` : ''), model: optimizationSnapshot ? chatModel : gateway.model, kind: 'chat', ...settings, context
+          clientRequestId, prompt: subject + (title ? `\n标题：${title}` : ''), model: optimizationSnapshot ? selectedChatModel : gateway.model, kind: 'chat', ...settings, context
         });
         const referenceIds = parsed.map(item => store.addMedia(session.user_id, record.id, 'input', item.mime, item.bytes));
         store.setReferences(record.id, referenceIds);
@@ -366,6 +370,7 @@ function buildApplication(options, sub2apiAccount) {
       const thread = store.thread(input.threadId, session.user_id);
       if (!thread) throw new GatewayError('请选择创作记录。', 404);
       if (input.useContext != null && typeof input.useContext !== 'boolean') throw new GatewayError('上下文设置无效。', 400);
+      const selectedChatModel = chat ? chatSelection.select(input.chatModel) : null;
       const context = { enabled: chat ? input.useContext !== false : input.useContext === true };
       if (context.enabled && Object.hasOwn(input, 'contextParentId')) {
         if (input.contextParentId !== null) {
@@ -407,7 +412,7 @@ function buildApplication(options, sub2apiAccount) {
       if (integration && store.db.prepare('SELECT count(*) AS n FROM messages').get().n >= integration.maxJobs) {
         throw new GatewayError(`本轮 ${integration.maxJobs} 个测试请求已用完，请先核对结果和扣费后再继续。`, 429);
       }
-      const message = store.createMessage(session.user_id, thread.id, { clientRequestId, prompt, model: chat ? chatModel : gateway.model, kind: chat ? 'chat' : 'image', count, size, groupId, aspectRatio: geometry.aspectRatio, context });
+      const message = store.createMessage(session.user_id, thread.id, { clientRequestId, prompt, model: chat ? selectedChatModel : gateway.model, kind: chat ? 'chat' : 'image', count, size, groupId, aspectRatio: geometry.aspectRatio, context });
       if (chat) store.supersedePlans(thread.id, session.user_id);
       try {
         const referenceIds = parsed.map((item) => store.addMedia(session.user_id, message.id, 'input', item.mime, item.bytes));

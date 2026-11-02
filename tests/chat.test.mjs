@@ -1,3 +1,5 @@
+import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
+import { createChatModelSelection } from '../server/chat-models.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -24,7 +26,7 @@ async function fixture(options = {}) {
     converse: async (key, payload) => { calls.chats.push({ key, payload }); return options.converse ? options.converse(payload, calls.chats.length) : answer(); },
     generate: async (key, payload) => { calls.images.push({ key, payload }); return options.generate ? options.generate(payload) : { data: Array.from({ length: payload.count }, () => ({ b64_json: png })) }; }
   };
-  const app = createApplication({ dataDir: directory, gateway, concurrency: 10 });
+  const app = createApplication({ dataDir: directory, gateway, concurrency: 10, ...(options.chatModels ? { chatModels: options.chatModels } : {}) });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${app.server.address().port}`;
   const request = async (path, { cookie, body } = {}) => {
@@ -192,4 +194,51 @@ test('chat gateway sends the requested model with no tools, handles refusals and
     mode = 'moderation'; const refusal = parseChatAnswer(await gateway.converse('fixture-key', payload)); assert.equal(refusal.ready, false); assert.match(refusal.reply, /未通过内容审核/);
     assert.equal(hits.length, 4); assert.ok(hits.every(item => item.body.model === 'gpt-6-luna'));
   } finally { await new Promise(resolve => upstream.close(resolve)); }
+});
+
+
+test('selected conversation models reach ordinary and professional requests; image confirmation keeps the image model', async () => {
+  const site = await fixture({ converse: payload => payload.messages[0].content.includes('专业方案助理')
+    ? JSON.stringify({ ready: true, decisions: [{ aspect: 'composition', detail: '保留主体，统一基线并留出安全边距。' }, { aspect: 'preservation', detail: '保留原有配色和结构，不添加未要求的文字。' }] }) : answer() });
+  try {
+    const cookie = await site.login(), thread = await site.thread(cookie);
+    assert.deepEqual((await site.request('/api/me', { cookie })).data.chatModels, ['gpt-6-luna', 'gpt-6.1-sol']);
+    const first = await site.chat(cookie, thread, { chatModel: 'gpt-6.1-sol' });
+    assert.equal(site.calls.chats[0].payload.model, 'gpt-6.1-sol');
+    await site.chat(cookie, thread, { chatModel: 'gpt-6-luna' });
+    assert.equal(site.calls.chats[1].payload.model, 'gpt-6-luna');
+    // The old plan stays superseded after switching and cannot launch a generation.
+    assert.equal((await site.confirm(cookie, first.id)).status, 409);
+    const style = STYLE_CATALOG.find(s => s.inputMode !== 'reference');
+    const response = await site.request('/api/style-plans', { cookie, body: { clientRequestId: crypto.randomUUID(), threadId: thread, styleId: style.id, styleVersion: style.version, subject: '一把蓝色椅子', title: '', styleOptimization: 'professional', groupId: 2, size: '2K', count: 1, references: [], chatModel: 'gpt-6.1-sol' } });
+    assert.equal(response.status, 202);
+    const plan = await site.wait(response.data.job.id, cookie);
+    assert.equal(plan.status, 'done');assert.equal(plan.proposal.optimization.model, 'gpt-6.1-sol');
+    assert.equal(site.calls.chats.at(-1).payload.model, 'gpt-6.1-sol');
+    const confirmed = await site.confirm(cookie, plan.id, { chatModel: 'untrusted-override' });
+    assert.equal(confirmed.status, 202);const image = await site.wait(confirmed.data.job.id, cookie);
+    assert.equal(image.model, 'gpt-image-2.5');assert.equal(site.calls.images.length, 1);
+  } finally { await site.stop(); }
+});
+
+test('unoffered conversation model IDs are rejected before tasks or paid calls are created', async () => {
+  const site = await fixture({ chatModels: ['gpt-6-luna'] });
+  try {
+    const cookie = await site.login(), thread = await site.thread(cookie);
+    for (const chatModel of ['gpt-6.1-sol', 'gpt-5.4', '', null, {}, ['gpt-6-luna']]) {
+      assert.equal((await site.submit(cookie, thread, { chatModel })).status, 400);
+      const style = STYLE_CATALOG.find(s => s.inputMode !== 'reference');
+      const bad = await site.request('/api/style-plans', { cookie, body: { clientRequestId: crypto.randomUUID(), threadId: thread, styleId: style.id, styleVersion: style.version, subject: '蓝色椅子', groupId: 2, chatModel } });
+      assert.equal(bad.status, 400);
+    }
+    assert.equal(site.calls.chats.length, 0);assert.equal(site.calls.images.length, 0);
+    assert.equal((await site.request('/api/threads/' + thread, { cookie })).data.messages.length, 0);
+    await site.chat(cookie, thread);assert.equal(site.calls.chats[0].payload.model, 'gpt-6-luna');
+  } finally { await site.stop(); }
+});
+
+test('deployment model allowlist preserves default and rejects invalid configuration', () => {
+  const config = createChatModelSelection('gpt-6-luna', ['gpt-6.1-sol', 'gpt-6.1-sol']);
+  assert.deepEqual(config.models, ['gpt-6-luna', 'gpt-6.1-sol']);assert.equal(config.select(undefined), 'gpt-6-luna');
+  for (const list of [[], [''], ['a b'], 'gpt-6.1-sol', [null]]) assert.throws(() => createChatModelSelection('gpt-6-luna', list));
 });
