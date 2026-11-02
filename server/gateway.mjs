@@ -53,7 +53,7 @@ export function classifyAccountFailure(status, body, path) {
 }
 
 export function classifyFailure(status, body) {
-  const detail = String(body?.error?.message || body?.message || '');
+  const detail = String(body?.error?.message || (typeof body?.error === 'string' ? body.error : '') || body?.message || '');
   const code = String(body?.error?.code || body?.error?.type || body?.code || '');
   const moderation = /^(content_policy_violation|content_filter|content_filtered|safety_violation|moderation_blocked)$/i.test(code)
     || /content[_ -]policy[_ -]violation|safety system|blocked by.{0,30}(safety|moderation|content filter)|violat(?:e|es|ed|ion).{0,35}(content|safety).{0,15}polic|内容.{0,15}(审核未通过|未通过审核|违规|被拦截)|违禁词|色情|不符合.{0,10}(内容|安全).{0,5}(政策|规则)|moderation.{0,15}(blocked|rejected)|NSFW.{0,20}(blocked|rejected|detected)/i.test(detail);
@@ -62,6 +62,10 @@ export function classifyFailure(status, body) {
   if (moderation) return new GatewayError(`提示词或参考图未通过内容审核，本次未生成图片。请修改内容后重试；${billing}`, 400, false, 'content_refused');
   if (status === 400 && /unknown parameter.{0,20}(?:tools\[\d+\]\.n|['"]n['"])|only.{0,12}(?:n\s*=\s*1|one image)|n.{0,8}must be 1|不支持.{0,8}(?:多张|批量)/i.test(detail)) {
     return new GatewayError(`当前生图线路不支持一次生成多张图片。请将张数改为 1 张后再试。${billing}`, 400, false, 'batch_unsupported');
+  }
+  if (status === 400 && /unknown parameter|unsupported parameter|unrecognized parameter/i.test(detail)) {
+    const parameter = /(?:response_format|output_format|quality|background|size|model|moderation)/i.exec(detail)?.[0]?.toLowerCase();
+    if (parameter) return new GatewayError(`当前生图线路不接受“${parameter}”参数，属于接口兼容问题。请联系管理员微信 panrui12 处理；若余额有扣除，请一并核对账单。`, 400, false, 'parameter_unsupported');
   }
   if (status === 429) {
     if (/usage limit|insufficient_quota|quota|额度|配额/i.test(`${code} ${detail}`)) {
@@ -264,17 +268,19 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       }
       const route = references.length ? '/v1/images/edits' : '/v1/images/generations';
       let body, headers = { authorization: `Bearer ${key}` };
+      // These native Images2.5 aliases reject response_format; their normal response is already readable below.
+      const useResponseFormat = !['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'].includes(requestModel);
       if (references.length) {
         body = new FormData();
         body.set('model', requestModel);
         body.set('prompt', prompt);
         body.set('size', requestSize);
         body.set('n', String(count));
-        body.set('response_format', 'b64_json');
+        if (useResponseFormat) body.set('response_format', 'b64_json');
         references.forEach((item, index) => body.append('image[]', new Blob([item.bytes], { type: item.mime }), `reference-${index + 1}.${item.mime.split('/')[1]}`));
       } else {
         headers['content-type'] = 'application/json';
-        body = JSON.stringify({ model: requestModel, prompt, size: requestSize, n: count, response_format: 'b64_json' });
+        body = JSON.stringify({ model: requestModel, prompt, size: requestSize, n: count, ...(useResponseFormat ? { response_format: 'b64_json' } : {}) });
       }
       let response;
       try {
