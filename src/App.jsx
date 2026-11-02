@@ -1,3 +1,4 @@
+import { DEFAULT_IMAGE_MODEL, imageModelLabel } from '../shared/image-models.mjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownToLine, ArrowRight, Check, Clock3, Copy, ImagePlus, Layers3,
@@ -236,7 +237,9 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   const [user, setUser] = useState(initial.user);
   const [groups, setGroups] = useState(initial.groups);
   const chatModels = useMemo(() => initial.chatModels?.length ? initial.chatModels : [initial.chatModel || 'gpt-6-luna'], [initial.chatModels, initial.chatModel]);
-  const conversations = useConversations({ call, userId: user.id, defaultGroupId: initial.groups[0]?.id ?? null, defaultChatModel: initial.chatModel || 'gpt-6-luna', chatModels, fileToDataUrl });
+  const imageOptions = useMemo(() => initial.imageModels?.length ? initial.imageModels : [{ id: initial.model || DEFAULT_IMAGE_MODEL, label: imageModelLabel(initial.model || DEFAULT_IMAGE_MODEL) }], [initial.imageModels, initial.model]);
+  const imageModels = useMemo(() => imageOptions.map(item => item.id), [imageOptions]);
+  const conversations = useConversations({ call, userId: user.id, defaultGroupId: initial.groups[0]?.id ?? null, defaultChatModel: initial.chatModel || 'gpt-6-luna', chatModels, defaultImageModel: initial.model || DEFAULT_IMAGE_MODEL, imageModels, fileToDataUrl });
   const { threads, activeId, messages, draft, sending, creating, notice, loading, loadError,
     choose, create, remove, rename, attachEditorReference, submit, prepareStylePlan, selectStyle, retryStyleCancellation, styleCancellationPending, confirmPlan, confirming, editDraft, setNotice, addFiles, removeRef, replaceRefs, reloadThread } = conversations;
   const { prompt, refs, size, count, groupId } = draft;
@@ -390,7 +393,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   }
   function retry(item) {
     replaceRefs(item.referenceIds.map((id) => ({ mediaId: id, objectUrl: `/api/media/${id}`, name: '参考图' })), item.prompt);
-    editDraft({ ...imageSettingsForRetry(item), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
+    editDraft({ ...imageSettingsForRetry(item), ...(imageModels.includes(item.model) ? { imageModel: item.model } : {}), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
     textInput.current?.focus();
   }
   async function logout() {
@@ -408,7 +411,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     <Sidebar threads={threads} activeId={activeId} choose={chooseThread} create={createThread} remove={remove} rename={rename} user={user} onLogout={logout} open={sidebarOpen} setOpen={setSidebarOpen} busy={creating || logoutBusy || sessionBlocked} accountOrigin={accountOrigin} onOpenMarket={openMarket} marketOpen={marketOpen} onOpenEditor={() => openEditor()} editorOpen={editorOpen} />
     <div className="workspace-main" style={editorOpen ? { display: 'none' } : undefined}>
       <a className="skip-link" href="#main-content">跳转到创作对话</a>
-      <header className="topbar"><div className="topbar-left"><button className="icon-button menu-toggle" title="打开创作列表" aria-label="打开创作列表" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="breadcrumb"><span>创作空间</span><span className="breadcrumb-slash">/</span><strong>{marketOpen ? '风格市场' : threads.find((item) => item.id === activeId)?.title || '新的创作'}</strong></div></div><div className="topbar-right"><button className="ed-open-top" onClick={() => openEditor()}><SlidersHorizontal size={16} /><span>图片编辑台</span></button><span className="model-chip"><span className="model-dot" /> Images 2.5</span><span className="balance"><Wallet size={16} /> 余额 <strong>{Number(user.balance || 0).toFixed(2)}</strong></span></div></header>
+      <header className="topbar"><div className="topbar-left"><button className="icon-button menu-toggle" title="打开创作列表" aria-label="打开创作列表" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="breadcrumb"><span>创作空间</span><span className="breadcrumb-slash">/</span><strong>{marketOpen ? '风格市场' : threads.find((item) => item.id === activeId)?.title || '新的创作'}</strong></div></div><div className="topbar-right"><button className="ed-open-top" onClick={() => openEditor()}><SlidersHorizontal size={16} /><span>图片编辑台</span></button><span className="model-chip"><span className="model-dot" /> {imageModelLabel(draft.imageModel)}</span><span className="balance"><Wallet size={16} /> 余额 <strong>{Number(user.balance || 0).toFixed(2)}</strong></span></div></header>
       {initial.demo && <div className="demo-strip">本地预览 · 图片和余额为示例，不调用中转</div>}
       {initial.integration && <div className="demo-strip integration-strip">管理员真实联调 · 按中转价格扣费 · 本轮最多 {initial.integration.maxJobs} 个单图请求</div>}
       <div className={`workspace-stage${marketOpen ? ' is-market' : isEmpty ? ' is-empty' : ''}`}>
@@ -439,7 +442,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
           </div>
           {chosenStyle && <p className="composer-style-hint">{chosenStyle.inputMode === 'reference' ? '上传参考图，发送后查看方案；点 × 取消风格。' : '只写想画的内容即可；点 × 取消内置风格。'}</p>}
           {chosenStyle && prompt.trim().length > 1200 && <p className="composer-style-error" role="status">已有文字已保留。使用风格时最多 1200 字，可缩短内容或移除标签。</p>}
-          <ImageGeometry draft={draft} onChange={editDraft}><OptionPicker label="对话模型" className="chat-model-select" value={draft.chatModel} options={chatModels.map(model => ({ value: model, label: model }))} onChange={chatModel => editDraft({ chatModel })} />{chosenStyle && initial.features?.styleOptimization && <StyleOptimization compact style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}</ImageGeometry>
+          <ImageGeometry draft={draft} onChange={editDraft}><OptionPicker label="生图模型" className="image-model-select" value={draft.imageModel} options={imageOptions.map(item => ({ value: item.id, label: item.label }))} onChange={imageModel => editDraft({ imageModel })} /><OptionPicker label="对话模型" className="chat-model-select" value={draft.chatModel} options={chatModels.map(model => ({ value: model, label: model }))} onChange={chatModel => editDraft({ chatModel })} />{chosenStyle && initial.features?.styleOptimization && <StyleOptimization compact style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}</ImageGeometry>
           <div className="composer-toolbar"><div className="composer-options"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { addFiles(event.target.files || []); event.target.value = ''; }} /><button className="tool-button" onClick={() => fileInput.current?.click()} title="添加参考图片，也可将图片拖入输入框" aria-label="添加参考图片" disabled={refs.length >= 4}><Paperclip size={18} /></button><span className="toolbar-divider" /><OptionPicker label="尺寸" className="size-select" value={size} options={SIZE_OPTIONS.map(item => ({ value: item, label: item }))} onChange={size => editDraft({ size })} /><div className="count-control" title="每次生成张数"><button aria-label="减少张数" onClick={() => editDraft({ count: Math.max(1, count - 1) })} disabled={count <= 1}>−</button><span>{count} 张</span><button aria-label="增加张数" onClick={() => editDraft({ count: Math.min(4, count + 1) })} disabled={count >= 4}>+</button></div><OptionPicker label="分组" className="group-select" value={groupId} options={groups.map(item => ({ value: item.id, label: item.name }))} onChange={groupId => editDraft({ groupId })} /></div><button className="send-button" onClick={submitComposer} disabled={!canSubmit} title={chosenStyle ? '发送并查看风格方案' : '发送对话'} aria-label={chosenStyle ? '发送风格描述' : '发送对话'}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}<span>发送</span></button></div>
         </div>
         <div className="composer-bottom"><span className="composer-hint">Enter 发送 · Shift + Enter 换行</span><span>对话与生图均按中转计费 · 生图需确认</span></div>

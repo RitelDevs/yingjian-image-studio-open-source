@@ -91,7 +91,7 @@ test('style preparation is local and confirmation pins prompt, settings, style a
   assert.equal(plan.kind, 'chat'); assert.equal(plan.status, 'done'); assert.equal(plan.proposal.state, 'ready');
   assert.equal(plan.proposal.style.version, defaultStyle.version); assert.equal(plan.proposal.style.id, defaultStyle.id);
   assert.ok(plan.proposal.prompt.includes('周末放空'));
-  assert.deepEqual(plan.proposal.context, { enabled: false });
+  assert.deepEqual(plan.proposal.context, { enabled: false, imageModel: 'gpt-image-2.5' });
   assert.equal(f.calls.images.length + f.calls.chats.length + f.calls.keys.length, 0);
   assert.equal(f.app.queue.active + f.app.queue.waiting, 0);
   assert.equal((await f.confirm(cookie, plan.id, { confirmed: false })).status, 400);

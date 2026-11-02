@@ -111,3 +111,12 @@ Turnstile 配置仍取自 Sub2API；本站转交单次验证证明，并区分�
 `/api/config`、`/api/me` 返回 `chatModels`。`POST /api/chat` 和 `POST /api/style-plans` 可传 `chatModel`，缺省沿用默认值，非白名单值在创建任务和调用模型前拒绝。普通对话任务model与专业优化snapshot.model均固定保存本次选择，修改选择不改变已提交任务和待确认方案；生图仍使用IMAGE_MODEL。直接套用不调用对话模型。
 
 输入区选择按用户和会话保存在当前浏览器sessionStorage。此入口用于创作对话和风格专业优化；编辑台的参数调整助手仍使用服务器默认模型。模型错误直接显示，不自动切换或重试其他模型。
+
+
+## 生图模型选择
+
+默认 `IMAGE_MODEL=gpt-image-2.5-sunburst`。`IMAGE_MODELS` 为逗号分隔的站点白名单，默认包含所配置默认模型和Flare/Sunburst。`/api/config`、`/api/me` 返回带id/label的imageModels。Flare的ID为gpt-image-2.5-flare（界面“Flare · 快速”），Sunburst为gpt-image-2.5-sunburst（“Sunburst · 牛逼”）。实际权限、供给和价格由所选中转分组决定。
+
+`/api/chat`、`/api/style-plans`、`/api/jobs`接受imageModel。对话本身仍用chatModel，生图模型保存在本轮上下文/待确认方案settings.imageModel中，确认后写入生图job.model；队列与网关以该记录发送JSON或multipart的model。确认请求不能替换已锁定的生图模型。旧版无imageModel的方案沿用原gpt-image-2.5，不静默切换为新模型；若上游不再支持则如实报错，不自动降级或重试。重新生成会带回原模型选择（仍可用时），需要重新确认。
+
+选择按用户/会话保存；新会话默认Sunburst，对话默认GPT-6-luna。编辑台为本地参数调整，不额外调用这两个生图模型。

@@ -254,7 +254,7 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       // Tools are never passed to the model or executed by this application.
       return typeof answer?.content === 'string' ? answer.content : '';
     },
-    async generate(key, { prompt, size, count, references, aspectRatio = 'auto' }) {
+    async generate(key, { prompt, size, count, references, aspectRatio = 'auto', model: requestModel = model }) {
       const { requestSize } = resolveImageGeometry(size, aspectRatio);
       if (demo) {
         const fs = await import('node:fs/promises');
@@ -266,7 +266,7 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       let body, headers = { authorization: `Bearer ${key}` };
       if (references.length) {
         body = new FormData();
-        body.set('model', model);
+        body.set('model', requestModel);
         body.set('prompt', prompt);
         body.set('size', requestSize);
         body.set('n', String(count));
@@ -274,7 +274,7 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
         references.forEach((item, index) => body.append('image[]', new Blob([item.bytes], { type: item.mime }), `reference-${index + 1}.${item.mime.split('/')[1]}`));
       } else {
         headers['content-type'] = 'application/json';
-        body = JSON.stringify({ model, prompt, size: requestSize, n: count, response_format: 'b64_json' });
+        body = JSON.stringify({ model: requestModel, prompt, size: requestSize, n: count, response_format: 'b64_json' });
       }
       let response;
       try {

@@ -25,12 +25,12 @@ test('model selection preserves central identity and origin checks through chat,
   for(const origin of [SUB2API_VISORA_ORIGIN,SUB2API_IMAGES_ORIGIN]){
    const config=(await call('/api/config',{origin})).data;assert.equal(config.accountMode,'sub2api');assert.equal(config.chatModel,'gpt-6-luna');assert.deepEqual(config.chatModels,['gpt-6-luna','gpt-6.1-sol']);
    const thread=(await call('/api/threads',{origin,body:{}})).data.thread.id;
-   const body={clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'一个轮椅',groupId:2,chatModel:'gpt-6.1-sol'};
+   const body={clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'一个轮椅',groupId:2,chatModel:'gpt-6.1-sol',imageModel:'gpt-image-2.5-flare'};
    assert.equal((await call('/api/chat',{origin,source:origin===SUB2API_VISORA_ORIGIN?SUB2API_IMAGES_ORIGIN:SUB2API_VISORA_ORIGIN,body})).status,403);
    assert.equal((await call('/api/chat',{origin,csrf:'wrong',body})).status,403);
    const accepted=await call('/api/chat',{origin,body});assert.equal(accepted.status,202);const job=await wait(accepted.data.job.id,origin);assert.equal(job.model,'gpt-6.1-sol');assert.equal(job.status,'done');
-   const style=STYLE_CATALOG.find(s=>s.inputMode!=='reference');const plan=await call('/api/style-plans',{origin,body:{clientRequestId:crypto.randomUUID(),threadId:thread,styleId:style.id,styleVersion:style.version,subject:'一个轮椅',groupId:2,size:'2K',count:1,styleOptimization:'professional',chatModel:'gpt-6.1-sol'}});assert.equal(plan.status,202);const complete=await wait(plan.data.job.id,origin);assert.equal(complete.status,'done');assert.equal(complete.proposal.optimization.model,'gpt-6.1-sol');
-   const image=await call('/api/plans/'+complete.id+'/confirm',{origin,body:{confirmed:true}});assert.equal(image.status,202);const done=await wait(image.data.job.id,origin);assert.equal(done.status,'done');assert.equal(done.model,'gpt-image-2.5');assert.ok(centralChecks.includes(origin));
+   const style=STYLE_CATALOG.find(s=>s.inputMode!=='reference');const plan=await call('/api/style-plans',{origin,body:{clientRequestId:crypto.randomUUID(),threadId:thread,styleId:style.id,styleVersion:style.version,subject:'一个轮椅',groupId:2,size:'2K',count:1,styleOptimization:'professional',chatModel:'gpt-6.1-sol',imageModel:'gpt-image-2.5-sunburst'}});assert.equal(plan.status,202);const complete=await wait(plan.data.job.id,origin);assert.equal(complete.status,'done');assert.equal(complete.proposal.optimization.model,'gpt-6.1-sol');
+   const image=await call('/api/plans/'+complete.id+'/confirm',{origin,body:{confirmed:true}});assert.equal(image.status,202);const done=await wait(image.data.job.id,origin);assert.equal(done.status,'done');assert.equal(done.model,'gpt-image-2.5-sunburst');assert.ok(centralChecks.includes(origin));
    revoked=true;const count=dispatch.length;const denied=await call('/api/chat',{origin,body:{...body,clientRequestId:crypto.randomUUID()}});assert.equal(denied.status,202);assert.equal((await wait(denied.data.job.id,origin)).status,'failed');assert.equal(dispatch.length,count);revoked=false;
   }
  }finally{await app.close();rmSync(directory,{recursive:true,force:true});}

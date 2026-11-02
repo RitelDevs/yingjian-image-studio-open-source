@@ -242,3 +242,59 @@ test('deployment model allowlist preserves default and rejects invalid configura
   assert.deepEqual(config.models, ['gpt-6-luna', 'gpt-6.1-sol']);assert.equal(config.select(undefined), 'gpt-6-luna');
   for (const list of [[], [''], ['a b'], 'gpt-6.1-sol', [null]]) assert.throws(() => createChatModelSelection('gpt-6-luna', list));
 });
+
+
+test('image model is snapshotted in chat plans and cannot be replaced by confirm payloads', async () => {
+ const site=await fixture();
+ try {
+  const cookie=await site.login(),thread=await site.thread(cookie);
+  const config=(await site.request('/api/me',{cookie})).data;
+  assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-flare'&&item.label.includes('快速')));
+  assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-sunburst'&&item.label.includes('牛逼')));
+  const plan=await site.chat(cookie,thread,{imageModel:'gpt-image-2.5-flare',references:[{dataUrl:'data:image/png;base64,'+png}]});
+  assert.equal(plan.proposal.settings.imageModel,'gpt-image-2.5-flare');assert.equal(plan.context.imageModel,'gpt-image-2.5-flare');
+  assert.equal((await site.confirm(cookie,plan.id,{imageModel:'gpt-image-2.5-sunburst'})).status,409);assert.equal(site.calls.images.length,0);
+  const accepted=await site.confirm(cookie,plan.id);const duplicate=await site.confirm(cookie,plan.id);
+  assert.equal(duplicate.data.job.id,accepted.data.job.id);
+  const done=await site.wait(accepted.data.job.id,cookie);assert.equal(done.model,'gpt-image-2.5-flare');assert.equal(site.calls.images.length,1);assert.equal(site.calls.images[0].payload.model,'gpt-image-2.5-flare');assert.equal(site.calls.images[0].payload.references.length,1);
+ }finally{await site.stop();}
+});
+
+test('both style modes and direct image tasks dispatch their selected image model without changing the chat model', async () => {
+ const site=await fixture({converse:()=>JSON.stringify({ready:true,decisions:[{aspect:'composition',detail:'保留轮椅结构并完整展示主体。'},{aspect:'preservation',detail:'保持原色，不增加无关部件。'}]})});
+ try{
+  const cookie=await site.login(),thread=await site.thread(cookie),style=STYLE_CATALOG.find(item=>item.inputMode!=='reference');
+  for(const mode of ['template','professional']){
+   const r=await site.request('/api/style-plans',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,styleId:style.id,styleVersion:style.version,subject:'一个轮椅',groupId:2,size:'2K',count:1,styleOptimization:mode,imageModel:'gpt-image-2.5-sunburst',chatModel:'gpt-6-luna',references:[{dataUrl:'data:image/png;base64,'+png}]}});assert.ok([201,202].includes(r.status));
+   const plan=await site.wait(r.data.job.id,cookie);assert.equal(plan.proposal.settings.imageModel,'gpt-image-2.5-sunburst');
+   const image=await site.confirm(cookie,plan.id);const done=await site.wait(image.data.job.id,cookie);assert.equal(done.model,'gpt-image-2.5-sunburst');assert.equal(site.calls.images.at(-1).payload.model,'gpt-image-2.5-sunburst');assert.equal(site.calls.images.at(-1).payload.references.length,1);
+  }
+  assert.equal(site.calls.chats.length,1);assert.equal(site.calls.chats[0].payload.model,'gpt-6-luna');
+  const direct=await site.request('/api/jobs',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'一个轮椅',groupId:2,imageModel:'gpt-image-2.5-flare'}});assert.equal(direct.status,202);assert.equal((await site.wait(direct.data.job.id,cookie)).model,'gpt-image-2.5-flare');assert.equal(site.calls.images.at(-1).payload.model,'gpt-image-2.5-flare');
+ }finally{await site.stop();}
+});
+
+test('invalid image models are rejected before chat or generation dispatch', async()=>{
+ const site=await fixture();
+ try{
+  const cookie=await site.login(),thread=await site.thread(cookie),style=STYLE_CATALOG.find(item=>item.inputMode!=='reference');
+  for(const imageModel of ['sunburst','gpt-image-unknown','',null,{},[]]){
+   assert.equal((await site.submit(cookie,thread,{imageModel})).status,400);
+   assert.equal((await site.request('/api/style-plans',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,styleId:style.id,styleVersion:style.version,subject:'轮椅',groupId:2,imageModel}})).status,400);
+   assert.equal((await site.request('/api/jobs',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'轮椅',groupId:2,imageModel}})).status,400);
+  }
+  assert.equal(site.calls.images.length,0);assert.equal(site.calls.chats.length,0);assert.equal((await site.request('/api/threads/'+thread,{cookie})).data.messages.length,0);
+ }finally{await site.stop();}
+});
+
+test('gateway sends selected aliases in image JSON and multipart and never falls back',async()=>{
+ const requests=[];let fail=false;
+ const upstream=createServer(async(req,res)=>{const chunks=[];for await(const part of req)chunks.push(part);requests.push({path:req.url,body:Buffer.concat(chunks).toString()});res.writeHead(fail?400:200,{'content-type':'application/json'});res.end(JSON.stringify(fail?{error:{message:'Model not supported'}}:{data:[{b64_json:png}]}));});
+ await new Promise(r=>upstream.listen(0,'127.0.0.1',r));const gateway=createGateway('http://127.0.0.1:'+upstream.address().port,'gpt-image-2.5');
+ try{
+  for(const model of ['gpt-image-2.5-flare','gpt-image-2.5-sunburst'])for(const references of [[],[{mime:'image/png',bytes:Buffer.from(png,'base64')}]] ){
+   await gateway.generate('fixture-only-key',{model,prompt:'轮椅',size:'2K',count:1,references});const sent=requests.at(-1);assert.equal(sent.path,references.length?'/v1/images/edits':'/v1/images/generations');assert.ok(sent.body.includes(model));if(!references.length)assert.equal(JSON.parse(sent.body).model,model);
+  }
+  fail=true;await assert.rejects(gateway.generate('fixture-only-key',{model:'gpt-image-2.5-flare',prompt:'轮椅',size:'2K',count:1,references:[]}));assert.equal(requests.length,5);
+ }finally{await new Promise(r=>upstream.close(r));}
+});

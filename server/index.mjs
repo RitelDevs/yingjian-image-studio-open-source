@@ -1,3 +1,5 @@
+import { createImageModelSelection } from './image-models.mjs';
+import { DEFAULT_IMAGE_MODEL } from '../shared/image-models.mjs';
 import { createChatModelSelection } from './chat-models.mjs';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -76,10 +78,12 @@ function buildApplication(options, sub2apiAccount) {
   const cookieName = options.cookieName || (integration ? 'studio_integration_sid' : 'studio_sid');
   if (sub2apiAccount && (demo || integration || options.ssoEnabled || !SUB2API_STUDIO_ORIGINS.includes(sub2apiAccount.origin) ||
       ['handle', 'authenticate', 'authorizeSession', 'logout', 'close'].some(key => typeof sub2apiAccount[key] !== 'function'))) throw new Error('Invalid mixed Sub2API account configuration');
-  const gateway = options.gateway || createGateway(process.env.GATEWAY_BASE_URL || 'http://127.0.0.1:8080', process.env.IMAGE_MODEL || 'gpt-image-2.5', demo);
+  const gateway = options.gateway || createGateway(process.env.GATEWAY_BASE_URL || 'http://127.0.0.1:8080', process.env.IMAGE_MODEL || DEFAULT_IMAGE_MODEL, demo);
   const chatModel = options.chatModel || process.env.CHAT_MODEL || 'gpt-6-luna';
   const chatSelection = createChatModelSelection(chatModel, options.chatModels ?? (process.env.CHAT_MODELS ? process.env.CHAT_MODELS.split(',').map(value => value.trim()).filter(Boolean) : undefined));
   const chatModels = chatSelection.models;
+  const imageSelection = createImageModelSelection(gateway.model, options.imageModels ?? (process.env.IMAGE_MODELS ? process.env.IMAGE_MODELS.split(',').map(value => value.trim()).filter(Boolean) : undefined));
+  const imageModels = imageSelection.models;
   const publicOrigin = options.publicOrigin ?? process.env.PUBLIC_ORIGIN ?? sub2apiAccount?.origin ?? '';
   const configuredOrigins = options.publicOrigins ?? (process.env.PUBLIC_ORIGINS ? process.env.PUBLIC_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : sub2apiAccount ? (sub2apiAccount.origins ?? [sub2apiAccount.origin]) : null);
   const publicOrigins = [...new Set(configuredOrigins || (publicOrigin ? [publicOrigin] : []))];
@@ -142,7 +146,7 @@ function buildApplication(options, sub2apiAccount) {
   }
   async function api(req, res, path) {
     if (path === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true, version: VERSION, ...(options.previewId ? { previewId: options.previewId } : {}), queue: { active: queue.active, waiting: queue.waiting, limit: queue.limit } });
-    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, chatModel, chatModels, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
+    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, imageModels, chatModel, chatModels, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
     if (sub2apiAccount && /^\/api\/(?:login(?:[/-]|$)|demo-login$|sso(?:[/-]|$))/.test(path)) throw new GatewayError('请使用账号中心登录。', 404);
     if (path === '/api/login-config' && req.method === 'GET') { requestPublicOrigin(req); return send(res, 200, await gateway.loginConfig()); }
     if (await sso.handle(req, res, path, { send, parseJson, sessionCookie: cookie })) return;
@@ -195,7 +199,7 @@ function buildApplication(options, sub2apiAccount) {
       checkTestAccount(user);
       store.updateSession(session, { user });
       const groups = groupList(await gateway.groups(session.accessToken, session.context));
-      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, chatModel, chatModels, demo, integration, features: { styleOptimization: true }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
+      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, imageModels, chatModel, chatModels, demo, integration, features: { styleOptimization: true }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
     }
     if (path === '/api/threads' && req.method === 'GET') return send(res, 200, { threads: store.threads(session.user_id) });
     if (path === '/api/threads' && req.method === 'POST') return send(res, 201, { thread: store.createThread(session.user_id) });
@@ -238,6 +242,7 @@ function buildApplication(options, sub2apiAccount) {
       const input = await parseJson(req);
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new GatewayError('风格方案内容无效。', 400);
       const selectedChatModel = chatSelection.select(input.chatModel);
+      const selectedImageModel = imageSelection.select(input.imageModel);
       let optimizationMode;
       try { optimizationMode = normalizeStyleOptimization(input.styleOptimization); }
       catch (error) { throw new GatewayError(error.message, 400); }
@@ -299,12 +304,12 @@ function buildApplication(options, sub2apiAccount) {
       const optimizationSnapshot = optimizationMode === 'professional' ? createStyleOptimizationSnapshot({
         compiled, subject: (input.subject ?? '').trim(), title: (input.title ?? '').trim(), model: selectedChatModel, demo, styleSelectionId
       }) : null;
-      const context = { enabled: false, ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
-      const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId };
+      const context = { enabled: false, imageModel: selectedImageModel, ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
+      const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId, imageModel: selectedImageModel };
       const subject = (input.subject ?? '').trim() || `参考图套用：${compiled.style.name}`, title = (input.title ?? '').trim();
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, thread.id, {
-          clientRequestId, prompt: subject + (title ? `\n标题：${title}` : ''), model: optimizationSnapshot ? selectedChatModel : gateway.model, kind: 'chat', ...settings, context
+          clientRequestId, prompt: subject + (title ? `\n标题：${title}` : ''), model: optimizationSnapshot ? selectedChatModel : selectedImageModel, kind: 'chat', ...settings, context
         });
         const referenceIds = parsed.map(item => store.addMedia(session.user_id, record.id, 'input', item.mime, item.bytes));
         store.setReferences(record.id, referenceIds);
@@ -342,13 +347,15 @@ function buildApplication(options, sub2apiAccount) {
       if (plan.proposal.style && store.isStyleRevoked(session.user_id, plan.proposal.styleSelectionId || id)) throw new GatewayError('该风格已取消，请重新整理生成方案。', 409, false, 'style_revoked');
       if (plan.proposal.state !== 'ready') throw new GatewayError('这份方案已被后续对话更新，请确认最新方案。', 409);
       const { size, count, aspectRatio, groupId } = plan.proposal.settings;
+      const selectedImageModel = imageSelection.stored(plan.proposal.settings.imageModel);
+      if (Object.hasOwn(input, 'imageModel') && input.imageModel !== selectedImageModel) throw new GatewayError('方案的生图模型已锁定，请重新整理方案后再切换。', 409, false, 'image_model_locked');
       if (!groups.some(item => item.id === groupId)) throw new GatewayError('当前账号不能使用该方案的生图分组，请重新选择分组并整理方案。', 403);
       const images = plan.proposal.referenceIds.map(mediaId => store.media(mediaId, session.user_id));
       if (images.some(item => !item)) throw new GatewayError('方案中的参考图已过期，请重新上传后整理方案。', 400);
       if (images.reduce((n, item) => n + item.bytes.length, 0) > 24 * 1024 * 1024) throw new GatewayError('参考图总量超过 24 MB。', 413);
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, plan.threadId, {
-          clientRequestId: `confirmed-plan:${id}`, prompt, model: gateway.model, size, count, aspectRatio, groupId,
+          clientRequestId: `confirmed-plan:${id}`, prompt, model: selectedImageModel, size, count, aspectRatio, groupId,
           context: { ...plan.proposal.context, planId: id, ...(plan.proposal.style ? { style: plan.proposal.style } : {}), ...(plan.proposal.optimization ? { optimization: plan.proposal.optimization } : {}) }
         });
         const references = images.map(item => store.addMedia(session.user_id, record.id, 'input', item.mime, item.bytes));
@@ -371,7 +378,8 @@ function buildApplication(options, sub2apiAccount) {
       if (!thread) throw new GatewayError('请选择创作记录。', 404);
       if (input.useContext != null && typeof input.useContext !== 'boolean') throw new GatewayError('上下文设置无效。', 400);
       const selectedChatModel = chat ? chatSelection.select(input.chatModel) : null;
-      const context = { enabled: chat ? input.useContext !== false : input.useContext === true };
+      const selectedImageModel = imageSelection.select(input.imageModel);
+      const context = { enabled: chat ? input.useContext !== false : input.useContext === true, imageModel: selectedImageModel };
       if (context.enabled && Object.hasOwn(input, 'contextParentId')) {
         if (input.contextParentId !== null) {
           if (typeof input.contextParentId !== 'string') throw new GatewayError('上下文记录无效。', 400);
@@ -412,7 +420,7 @@ function buildApplication(options, sub2apiAccount) {
       if (integration && store.db.prepare('SELECT count(*) AS n FROM messages').get().n >= integration.maxJobs) {
         throw new GatewayError(`本轮 ${integration.maxJobs} 个测试请求已用完，请先核对结果和扣费后再继续。`, 429);
       }
-      const message = store.createMessage(session.user_id, thread.id, { clientRequestId, prompt, model: chat ? selectedChatModel : gateway.model, kind: chat ? 'chat' : 'image', count, size, groupId, aspectRatio: geometry.aspectRatio, context });
+      const message = store.createMessage(session.user_id, thread.id, { clientRequestId, prompt, model: chat ? selectedChatModel : selectedImageModel, kind: chat ? 'chat' : 'image', count, size, groupId, aspectRatio: geometry.aspectRatio, context });
       if (chat) store.supersedePlans(thread.id, session.user_id);
       try {
         const referenceIds = parsed.map((item) => store.addMedia(session.user_id, message.id, 'input', item.mime, item.bytes));
