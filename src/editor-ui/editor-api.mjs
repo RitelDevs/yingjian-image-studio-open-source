@@ -1,3 +1,4 @@
+import { call } from '../studio-api.js';
 import { ADJUSTMENT_DEFINITIONS, EDITOR_PRESETS } from '../../shared/editor-contract.mjs';
 
 const labels = Object.fromEntries(ADJUSTMENT_DEFINITIONS.map(item => [item.key, item.label]));
@@ -17,22 +18,12 @@ export function normalizeReply(value) {
   return { ...result, requestId: result.requestId || result.id };
 }
 
-async function request(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: 'same-origin', ...options,
-    headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...options.headers }
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) { const error = new Error(body?.error || '编辑对话暂时无法连接，请稍后再试。'); error.status = response.status; throw error; }
-  return normalizeReply(body);
+export async function submitEditorChat(input, signal, request = call) {
+  return normalizeReply(await request('/api/editor/chat', { method: 'POST', body: JSON.stringify(input), signal }));
 }
 
-export function submitEditorChat(input, signal) {
-  return request('/api/editor/chat', { method: 'POST', body: JSON.stringify(input), signal });
-}
-
-export function readEditorChat(requestId, signal) {
-  return request(`/api/editor/chat/${encodeURIComponent(requestId)}`, { signal });
+export async function readEditorChat(requestId, signal, request = call) {
+  return normalizeReply(await request(`/api/editor/chat/${encodeURIComponent(requestId)}`, { signal }));
 }
 
 export function canApplyReply(result, state, hasPendingPreview = false) {

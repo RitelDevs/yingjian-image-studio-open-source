@@ -74,7 +74,7 @@ async function fixture(t, options = {}) {
   t.after(async () => {
     for (let i = 0; app.queue.active && i < 500; i++) await pause(10);
     assert.equal(app.queue.active, 0, 'Queue must settle before cleanup');
-    await new Promise(resolve => app.server.close(resolve)); app.close();
+    await new Promise(resolve => app.server.close(resolve)); await app.close();
     if (upstream) await new Promise(resolve => upstream.close(resolve));
     const target = resolve(directory);
     assert.equal(dirname(target), resolve(tmpdir())); assert.ok(basename(target).startsWith('studio-style-test-'));

@@ -4,13 +4,14 @@
 
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --paper: #edf4f8; --white: #fff; --ink: #203449; --muted: #526679;
+  --paper: #edf4f8; --white: #fff; --ink: #203449; --muted: #3d5266;
   --line: #9caebc40; --blue: #c1def5; --blue-pale: #e7f2fb; --blue-strong: #2066b0;
   --glass: #ffffff40; --glass-bright: #ffffffb8; --glass-edge: #ffffffb3;
   --window-shadow: 0 24px 64px #23456816, 0 4px 12px #23456808;
   --floating-shadow: 0 12px 32px #23456814;
   --mono: "JetBrains Mono", Consolas, monospace;
   font-family: Outfit, "Noto Sans SC UI", "Noto Sans SC", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color-scheme: only light;
   color: var(--ink); background: #dbe9f2; font-synthesis: none; text-rendering: optimizeLegibility;
 }
 * { box-sizing: border-box; }
@@ -25,15 +26,20 @@ a { color: inherit; }
 .skip-link:focus { transform: none; }
 .brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; white-space: nowrap; color: var(--ink); }
 .brand-mark { display: block; flex: 0 0 30px; width: 30px; height: 30px; }
-.brand-name { display: block; font-size: 24px; font-weight: 700; line-height: 1.1; letter-spacing: -.02em; }
-.brand-name > span { display: block; margin-top: 5px; font-size: 8px; font-weight: 500; letter-spacing: .12em; color: var(--muted); }
+.brand-name { display: inline-flex; align-items: baseline; gap: 7px; font-size: 22px; font-weight: 650; line-height: 1.2; letter-spacing: -.02em; }
+.brand-name > .ritel-account-brand { font-size: 16px; color: var(--ink); text-transform: none; }
+.brand-name > .visora-name { font-family: Outfit, sans-serif; }
 .icon-button { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .icon-button:hover { background: #ffffffb3; color: var(--ink); }
 .primary-button { border: 0; border-radius: 16px; background: var(--blue-strong); color: white; font-weight: 600; box-shadow: 0 6px 16px #2066b022; }
 .primary-button:hover:not(:disabled) { background: #175898; transform: translateY(-1px); }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.loading-screen { display: flex; align-items: center; justify-content: center; gap: 24px; min-height: 100dvh; }
+.loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; min-height: 100dvh; padding: 32px 24px; }
+.account-unavailable { text-align: center; }
+.account-unavailable > .brand { flex-shrink: 0; max-width: 100%; }
+.account-unavailable > p { max-width: 36ch; margin: 0; font-size: 16px; line-height: 1.8; color: var(--muted); overflow-wrap: anywhere; }
+.account-unavailable > .demo-button { width: min(100%, 280px); margin: 0; }
 
 /* Three material levels: ambient background, translucent windows, bright input surface. */
 .login-shell { min-height: 100dvh; }
@@ -43,7 +49,7 @@ a { color: inherit; }
 .login-main { display: grid; grid-template-columns: .95fr 1fr; align-items: center; gap: 80px; width: min(100% - 64px, 1100px); min-height: 840px; margin: auto; padding-block: 72px; }
 .login-form-column { order: 2; padding: 48px; border: 1px solid var(--glass-edge); border-radius: 32px; background: var(--glass); box-shadow: var(--window-shadow); backdrop-filter: blur(40px) saturate(150%); }
 .login-content { width: min(100%, 380px); margin: auto; }
-.login-eyebrow { margin-bottom: 16px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .08em; }
+.login-eyebrow { margin-bottom: 16px; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: .08em; }
 .login-title { margin: 0 0 12px; font-size: 36px; font-weight: 650; letter-spacing: -.03em; line-height: 1.3; }
 .login-subtitle { margin: 0 0 32px; color: var(--muted); font-size: 14px; line-height: 1.7; }
 .login-content form { display: flex; flex-direction: column; }
@@ -55,11 +61,16 @@ a { color: inherit; }
 .password-toggle { position: absolute; right: 4px; top: 4px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 11px; background: transparent; color: var(--muted); }
 .password-toggle:hover { background: #ffffffb3; }
 .login-button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; height: 52px; padding: 0 20px; margin-top: 4px; font-size: 15px; }
+
+/* Account entry links keep their original focus affordance without underlines. */
+a.login-button, a.login-button:is(:hover, :focus, :focus-visible, :active),
+.account-row .avatar > a, .account-row .avatar > a:is(:hover, :focus, :focus-visible, :active),
+.account-row .account-meta strong > a, .account-row .account-meta strong > a:is(:hover, :focus, :focus-visible, :active) { text-decoration: none; }
 .demo-button { width: 100%; min-height: 48px; margin-top: 12px; border: 1px solid #ffffffcc; border-radius: 14px; background: #ffffff73; color: var(--ink); font-size: 14px; font-weight: 500; }
 .demo-button:hover { background: #ffffffd9; }
 .login-help { padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.8; }
 .login-help strong { color: var(--ink); font-weight: 600; white-space: nowrap; }
-.login-register-link { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 2px; border-radius: 6px; color: #2164a6; font-size: 14px; font-weight: 500; text-decoration: none; }
+.login-register-link { display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 8px 4px; border-radius: 6px; color: #175898; font-size: 14px; font-weight: 500; text-decoration: none; }
 .login-register-link:hover { text-decoration: underline; text-underline-offset: 4px; }
 .login-preview { display: flex; flex-direction: column; order: 1; min-width: 0; padding: 16px 0; }
 .login-preview-head, .preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
@@ -67,7 +78,7 @@ a { color: inherit; }
 .login-statement > span { color: var(--blue-strong); }
 .login-art-collection { padding: 12px; border: 1px solid var(--glass-edge); border-radius: 28px; background: var(--glass); box-shadow: var(--window-shadow); transform: rotate(-3deg); }
 .login-art-collection img { display: block; width: 100%; height: 280px; border-radius: 18px; object-fit: cover; }
-.preview-footer { margin-top: 32px; font-size: 11px; }
+.preview-footer { margin-top: 32px; font-size: 12px; }
 .form-error { margin: 0 0 20px; padding: 12px 16px; border: 1px solid #ecc7bf; border-radius: 12px; background: #fff3f0; color: #8d3529; font-size: 14px; line-height: 1.7; }
 .integration-login-note { margin: -12px 0 24px; padding: 12px 16px; border-radius: 12px; background: #fff2e6; color: #815326; font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }
 
@@ -75,14 +86,14 @@ a { color: inherit; }
 .workspace { --workspace-width: 880px; --workspace-gutter: 32px; height: 100dvh; min-height: 320px; display: flex; gap: 20px; width: min(100%, 1920px); margin: auto; padding: 24px; overflow: hidden; }
 .sidebar { display: flex; flex-direction: column; flex: 0 0 240px; width: 240px; height: 100%; padding: 24px 16px 16px; border: 1px solid var(--glass-edge); border-radius: 28px; background: var(--glass); box-shadow: var(--window-shadow); backdrop-filter: blur(40px) saturate(150%); }
 .sidebar-heading { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; min-height: 44px; padding-inline: 8px; }
-.sidebar .brand-name { font-size: 22px; }
+.sidebar .brand-name { flex-direction: column; align-items: flex-start; gap: 3px; font-size: 22px; }
 .sidebar .brand-mark { flex-basis: 26px; width: 26px; height: 26px; }
 .mobile-close, .menu-toggle, .sidebar-backdrop { display: none; }
 .new-thread { display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px; margin: 32px 0 32px; padding: 0 16px; border: 1px solid #ffffffa6; border-radius: 16px; background: #ffffff80; color: var(--ink); font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px #23456805; }
 .new-thread:hover:not(:disabled) { background: #ffffffe6; transform: translateY(-1px); }
 .sidebar-section-head { display: flex; align-items: center; justify-content: space-between; padding: 0 12px 12px; color: var(--muted); font-size: 12px; font-weight: 500; }
-.sidebar-section-tag { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; margin-left: -8px; border-radius: 7px; background: #d9e9f280; color: #4b6274; font-size: 11px; line-height: 1.5; letter-spacing: .04em; }
-.sidebar-section-head > span:last-child { font-size: 11px; font-variant-numeric: tabular-nums; }
+.sidebar-section-tag { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; margin-left: -8px; border-radius: 7px; background: #d9e9f280; color: #4b6274; font-size: 12px; line-height: 1.5; letter-spacing: .04em; }
+.sidebar-section-head > span:last-child { font-size: 12px; font-variant-numeric: tabular-nums; }
 .thread-search { width: 100%; min-height: 40px; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #ffffff99; border-radius: 12px; background: #ffffff40; color: var(--ink); font-size: 13px; }
 .thread-search::placeholder { color: var(--muted); }
 .thread-list { position: relative; isolation: isolate; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #71869a40 transparent; }
@@ -91,7 +102,7 @@ a { color: inherit; }
 .thread-row:hover:not(.selected) { background: #ffffff66; }
 .thread-main { display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: center; min-width: 0; height: 100%; overflow: hidden; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: inherit; text-align: left; }
 .thread-name { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
-.thread-date { margin-top: 6px; color: var(--muted); font-size: 11px; }
+.thread-date { margin-top: 6px; color: var(--muted); font-size: 12px; }
 .thread-menu-trigger { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: transparent; color: var(--muted); opacity: 0; }
 .thread-row:hover .thread-menu-trigger, .thread-row.selected .thread-menu-trigger, .thread-menu-trigger:focus-visible { opacity: 1; }
 .thread-delete { position: absolute; z-index: 5; right: 4px; top: 48px; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 12px 16px; border: 1px solid var(--glass-edge); border-radius: 12px; background: #f8fbfd; box-shadow: var(--floating-shadow); color: #9f4338; font-size: 13px; }
@@ -102,7 +113,7 @@ a { color: inherit; }
 .account-meta { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 4px; }
 .account-meta strong, .account-meta small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-meta strong { font-size: 13px; font-weight: 600; }
-.account-meta small { font-size: 11px; color: var(--muted); }
+.account-meta small { font-size: 12px; color: var(--muted); }
 .logout { width: 36px; height: 36px; }
 .workspace-main { display: flex; flex: 1; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; border: 1px solid var(--glass-edge); border-radius: 28px; background: #ffffff38; box-shadow: var(--window-shadow); backdrop-filter: blur(40px) saturate(150%); }
 .topbar { display: flex; flex: 0 0 76px; align-items: center; justify-content: space-between; gap: 16px; padding: 0 32px; border-bottom: 1px solid #ffffff73; }
@@ -116,7 +127,7 @@ a { color: inherit; }
 .model-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue-strong); }
 .balance { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ffffffa6; border-radius: 50px; background: #ffffff4d; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .balance strong { color: var(--ink); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.demo-strip { padding: 8px 16px; background: #e7f3fc66; color: #405c75; font-size: 11px; line-height: 1.5; text-align: center; }
+.demo-strip { padding: 8px 16px; background: #e7f3fc66; color: #405c75; font-size: 12px; line-height: 1.5; text-align: center; }
 .integration-strip { background: #fff0e4; color: #815326; }
 .workspace-stage { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; container: studio / inline-size; }
 .workspace-stage.is-empty { padding-block: 32px; overflow-y: auto; }
@@ -141,7 +152,7 @@ a { color: inherit; }
 .reference-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px 40px; }
 .reference-strip img { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; }
 .response-block { margin: 24px 0 0 40px; }
-.status { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; margin-left: 4px; border-radius: 50px; background: #e8f3ef; color: #326344; font-size: 11px; font-weight: 500; }
+.status { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; margin-left: 4px; border-radius: 50px; background: #e8f3ef; color: #326344; font-size: 12px; font-weight: 500; }
 .status-failed, .status-unknown { color: #92452f; background: #faeee7; }
 .status-partial { color: #7c611f; background: #f7f0dc; }
 .progress-line { display: flex; align-items: center; gap: 12px; margin: 20px 0; color: var(--muted); font-size: 14px; }
@@ -228,8 +239,8 @@ a { color: inherit; }
 .composer-ref button { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: white; }
 .composer-ref button svg { width: 24px; height: 24px; padding: 4px; border-radius: 50%; background: #203449d9; }
 .ref-label { align-self: center; color: var(--muted); font-size: 12px; }
-.composer-bottom { display: flex; justify-content: space-between; gap: 16px; margin-top: 12px; padding-inline: 4px; color: var(--muted); font-size: 11px; }
-.composer-bottom > span:last-child { margin-left: auto; font-size: 10px; }
+.composer-bottom { display: flex; justify-content: space-between; gap: 16px; margin-top: 12px; padding-inline: 4px; color: var(--muted); font-size: 12px; }
+.composer-bottom > span:last-child { margin-left: auto; font-size: 12px; }
 .notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 8px 8px 8px 16px; border: 1px solid #ffffffb3; border-radius: 16px; background: #edf6fdee; color: #355875; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .notice .icon-button { width: 44px; height: 44px; }
 .lightbox { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 24px; background: #132537e8; backdrop-filter: blur(12px); }
@@ -271,11 +282,11 @@ a { color: inherit; }
   .topbar-right { gap: 8px; }
   .breadcrumb strong { max-width: 115px; font-size: 13px; }
   .breadcrumb > span { display: none; }
-  .model-chip { font-size: 10px; gap: 4px; }
+  .model-chip { font-size: 12px; gap: 4px; }
   .balance { font-size: 0; gap: 6px; padding: 8px; }
   .balance strong { font-size: 13px; }
   .balance svg { width: 14px; }
-  .demo-strip { font-size: 10px; padding: 8px; }
+  .demo-strip { font-size: 12px; padding: 8px; }
   .conversation-inner { padding-block: 24px; }
   .prompt-text, .reference-strip, .response-block, .turn-settings { margin-left: 0; }
   .image-grid { gap: 8px; }
@@ -330,7 +341,7 @@ a { color: inherit; }
 .confirmation-actions { --control-height: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
 .confirmation-request .turn-settings { margin-left: 0; }
 .confirmation-request .send-button { width: auto; margin-left: auto; }
-@media (max-width: 700px) { .confirmation-actions { --control-height: 44px; } .composer-bottom { flex-wrap: wrap; } .composer-bottom > span:last-child { font-size: 11px; } }
+@media (max-width: 700px) { .confirmation-actions { --control-height: 44px; } .composer-bottom { flex-wrap: wrap; } .composer-bottom > span:last-child { font-size: 12px; } }
 
 /* File drag feedback is an overlay: the composer keeps its existing dimensions. */
 .composer { position: relative; --drop-ease-out: var(--ease-out); }
@@ -379,5 +390,16 @@ a { color: inherit; }
 .image-item .image-actions { position: static; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 8px; background: #ffffff80; }
 .image-actions .image-to-editor { margin-right: auto; display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: auto; padding: 0 13px; border-radius: 22px; font-size: 12px; white-space: nowrap; }
 .reference-image-item { position: relative; }
-.reference-image-item .reference-to-editor { display: block; width: 72px; min-height: 28px; margin-top: 4px; padding: 3px 0; border: 1px solid #ffffffa6; border-radius: 8px; background: #ffffffb3; color: var(--ink); font-size: 10px; }
-@media (max-width: 700px) { .image-actions .image-to-editor { gap: 5px; padding-inline: 10px; font-size: 11px; } }
+.reference-image-item .reference-to-editor { display: block; width: 72px; min-height: 28px; margin-top: 4px; padding: 3px 0; border: 1px solid #ffffffa6; border-radius: 8px; background: #ffffffb3; color: var(--ink); font-size: 12px; }
+@media (max-width: 700px) { .image-actions .image-to-editor { gap: 5px; padding-inline: 10px; font-size: 12px; } }
+
+/* Only the Ritel.SI brand token uses the approved Cinzel original. */
+@font-face{font-family:"Ritel SI Cinzel";src:url("/fonts/RitelSI-Cinzel-mixed-case.woff2") format("woff2");font-style:normal;font-weight:400;font-display:swap}
+.ritel-account-brand{font-family:"Ritel SI Cinzel",serif;font-weight:400;font-synthesis:none;letter-spacing:0;white-space:nowrap}
+
+/* Keep the full product name legible within the existing mobile glass header. */
+@media (max-width: 700px) {
+  .showcase-header .brand { gap: 8px; }
+  .showcase-header .brand-name { flex-direction: column; align-items: flex-start; gap: 1px; font-size: 18px; }
+  .showcase-header .brand-name > .ritel-account-brand { font-size: 12px; }
+}

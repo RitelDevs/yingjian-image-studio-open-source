@@ -37,7 +37,7 @@ const rootFiles=['package.json','package-lock.json','index.html','vite.config.js
 for(const file of rootFiles)safeCopy(join(root,file),join(source,file));
 for(const dir of ['src','server','shared','public','tests','docs'])safeCopy(join(root,dir),join(source,dir));
 for(const file of ['build.mjs','package-release.mjs','check-editor-workspace.mjs','check-compact-composer.mjs'])safeCopy(join(root,'scripts',file),join(source,'scripts',file));
-const deploymentFiles=['README.md','compose.example.yaml','production.env.example','nginx.example.conf','sso-bridge.inc'];
+const deploymentFiles=['README.md','compose.example.yaml','production.env.example','nginx.example.conf','sso-bridge.inc','VISORA.md'];
 for(const file of deploymentFiles){safeCopy(join(root,'deploy',file),join(source,'deploy',file));safeCopy(join(root,'deploy',file),join(deployment,'deploy',file));}
 for(const dir of ['dist','dist-server']){
  if(!existsSync(join(root,dir)))throw new Error('Run npm run build:published before packaging.');

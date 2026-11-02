@@ -29,6 +29,11 @@ export function createStore(directory) {
       refresh_token TEXT, access_expires INTEGER NOT NULL, expires_at INTEGER NOT NULL,
       validated_at INTEGER NOT NULL, user_json TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS sub2api_account_sessions (
+      id_hash TEXT PRIMARY KEY REFERENCES sessions(id_hash) ON DELETE CASCADE,
+      consumer_key TEXT NOT NULL, origin TEXT NOT NULL, issuer TEXT NOT NULL, client_id TEXT NOT NULL,
+      UNIQUE(origin, issuer, client_id, consumer_key)
+    );
     CREATE TABLE IF NOT EXISTS api_keys (
       user_id INTEGER NOT NULL, group_id INTEGER NOT NULL, key_id INTEGER,
       encrypted_key TEXT NOT NULL, PRIMARY KEY (user_id, group_id)
@@ -63,6 +68,9 @@ export function createStore(directory) {
     );
     CREATE INDEX IF NOT EXISTS media_message_idx ON media(message_id);
   `);
+  if (!db.prepare('PRAGMA table_info(sub2api_account_sessions)').all().some(column => column.name === 'context_json')) {
+    db.exec('ALTER TABLE sub2api_account_sessions ADD COLUMN context_json TEXT');
+  }
   if (!db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'aspect_ratio')) {
     db.exec("ALTER TABLE messages ADD COLUMN aspect_ratio TEXT NOT NULL DEFAULT 'auto'");
   }
@@ -107,12 +115,21 @@ export function createStore(directory) {
       accessToken: decrypt(row.access_token), refreshToken: decrypt(row.refresh_token)
     };
   }
+  function withNativeContext(row) {
+    if (!row) return row;
+    const binding = db.prepare('SELECT context_json FROM sub2api_account_sessions WHERE id_hash=?').get(row.id_hash);
+    if (binding) {
+      if (!binding.context_json) throw new Error('Verified native context required');
+      Object.defineProperty(row, 'context', {value: Object.freeze(JSON.parse(binding.context_json)), enumerable: false});
+    }
+    return row;
+  }
   function sessionByHash(hash) {
     const row = db.prepare('SELECT * FROM sessions WHERE id_hash=? AND expires_at>?').get(hash, Date.now());
-    return row && {
+    return withNativeContext(row && {
       ...row, user: JSON.parse(row.user_json),
       accessToken: decrypt(row.access_token), refreshToken: decrypt(row.refresh_token)
-    };
+    });
   }
   function updateSession(row, patch) {
     const user = patch.user || row.user;
@@ -173,6 +190,34 @@ export function createStore(directory) {
   }
   return {
     root, db, encrypt, decrypt, sessionHash, saveSession, session, sessionByHash, updateSession, media, addMedia, cleanup, result,
+    bindSub2apiSession({ consumerKey, origin, issuer, clientId, user, native }, { background = false } = {}) {
+      const idHash = sessionHash(JSON.stringify(['sub2api', origin, issuer, clientId, consumerKey]));
+      const previous = db.prepare('SELECT * FROM sessions WHERE id_hash=?').get(idHash);
+      if (previous && previous.user_id !== user.id) throw new Error('Sub2API UID binding changed');
+      if (background && (!previous || previous.expires_at <= Date.now())) return null;
+      const now = Date.now();
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.prepare(`INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET
+          access_token=excluded.access_token, refresh_token=NULL, access_expires=excluded.access_expires,
+          expires_at=excluded.expires_at, validated_at=excluded.validated_at, user_json=excluded.user_json`)
+          .run(idHash, user.id, encrypt(native.accessToken), null, native.accessExpiresAt,
+            background ? previous.expires_at : now + WEEK_MS, now, JSON.stringify(user));
+        if (!native.context) throw new Error('Verified native context required');
+        db.prepare(`INSERT INTO sub2api_account_sessions (id_hash,consumer_key,origin,issuer,client_id,context_json)
+          VALUES (?,?,?,?,?,?) ON CONFLICT(id_hash) DO UPDATE SET context_json=excluded.context_json`)
+          .run(idHash, consumerKey, origin, issuer, clientId, JSON.stringify(native.context));
+        db.exec('COMMIT');
+      } catch (error) { db.exec('ROLLBACK'); throw error; }
+      return sessionByHash(idHash);
+    },
+    sub2apiSessionBinding(hash) {
+      return db.prepare('SELECT * FROM sub2api_account_sessions WHERE id_hash=?').get(hash);
+    },
+    forgetSub2apiSession({ consumerKey, origin, issuer, clientId }) {
+      db.prepare(`DELETE FROM sessions WHERE id_hash IN (SELECT id_hash FROM sub2api_account_sessions
+        WHERE consumer_key=? AND origin=? AND issuer=? AND client_id=?)`).run(consumerKey, origin, issuer, clientId);
+    },
     getKey(userId, groupId) {
       const row = db.prepare('SELECT * FROM api_keys WHERE user_id=? AND group_id=?').get(userId, groupId);
       return row && { key: decrypt(row.encrypted_key), keyId: row.key_id };

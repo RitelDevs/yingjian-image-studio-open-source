@@ -2,21 +2,32 @@ import { GatewayError, readImageResult } from './gateway.mjs';
 import { conversationContext } from './conversation-context.mjs';
 import { buildChatRequest, chatPayload, parseChatAnswer } from './chat-planner.mjs';
 import { createKeyProvider } from './editor/keys.mjs';
+import { authorizeBoundSession, liveSession } from './editor/session.mjs';
 import { runStyleOptimization } from './style-optimizer.mjs';
 
-export function createQueue(store, gateway, concurrency = 2, ensureKey = createKeyProvider(store, gateway)) {
+export function createQueue(store, gateway, concurrency = 2, ensureKey, { authorizeSession } = {}) {
+  if (authorizeSession !== undefined && typeof authorizeSession !== 'function') throw new TypeError('Queue authorization must be a server function');
+  ensureKey ??= createKeyProvider(store, gateway, { authorizeSession });
   const pending = [];
   const runningThreads = new Set();
-  let active = 0;
+  let active = 0, closing = false, closePromise;
+  const drainWaiters = new Set();
+  const drain = () => active || pending.length ? new Promise(resolve => drainWaiters.add(resolve)) : Promise.resolve();
   async function run(job) {
     let chat = false;
     const { id, referenceIds, prompt, size, count, groupId, aspectRatio = 'auto' } = job;
-    store.updateMessage(id, 'running');
     try {
-      const session = store.sessionByHash(job.sessionHash);
-      if (!session) throw new GatewayError('登录已失效，本次任务尚未向上游提交生图。请退出后重新登录再试。', 401, false, 'authentication_expired');
-      if (session.access_expires < Date.now() + 60_000 && session.refreshToken) {
+      store.updateMessage(id, 'running');
+      const current = store.contextJob(id);
+      if (!current) throw new GatewayError('创作记录已失效，请重新开始。', 400);
+      const userId = current.userId;
+      chat = current.kind === 'chat';
+      let session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId, { allowExpired: true });
+      if (!authorizeSession && session.access_expires < Date.now() + 60_000 && session.refreshToken) {
+        const predecessor = { accessToken: session.accessToken, refreshToken: session.refreshToken };
         const refreshed = await gateway.refresh(session.refreshToken);
+        session = liveSession(store, job.sessionHash, userId, { allowExpired: true, token: predecessor.accessToken });
+        if (session.refreshToken !== predecessor.refreshToken) throw new GatewayError('登录状态已变更，请重新登录后再试。', 401, false, 'authentication_changed');
         store.updateSession(session, {
           accessToken: refreshed.access_token, refreshToken: refreshed.refresh_token || session.refreshToken,
           accessExpires: Date.now() + (Number(refreshed.expires_in) || 900) * 1000
@@ -25,12 +36,12 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey = createK
       if (!session.accessToken || session.access_expires < Date.now()) {
         throw new GatewayError('等待期间登录已过期，本次任务尚未向上游提交生图。请退出后重新登录再试。', 401, false, 'authentication_expired');
       }
-      await gateway.profile(session.accessToken);
-      const current = store.contextJob(id);
-      if (!current || current.userId !== session.user_id) throw new GatewayError('创作记录已失效，请重新开始。', 400);
-      chat = current.kind === 'chat';
+      let originalToken = session.accessToken;
+      const user = await gateway.profile(originalToken, session.context);
+      if (authorizeSession && (user?.id !== userId || user.status !== 'active')) throw new GatewayError('账号不可用，本次任务尚未向上游提交。', 403, false, 'account_unavailable');
+      session = liveSession(store, job.sessionHash, userId, { token: originalToken });
       if (chat && current.context.styleOptimization?.mode === 'professional') {
-        await runStyleOptimization({ store, gateway, ensureKey, current, session });
+        await runStyleOptimization({ store, gateway, ensureKey, current, session, authorizeSession });
         return;
       }
       const resolved = chat ? buildChatRequest(store, current) : conversationContext(store, current);
@@ -40,12 +51,17 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey = createK
         effectiveReferences = (resolved.inheritedImages || [resolved.image]).map(image => store.addMedia(session.user_id, id, 'input', image.mime, image.bytes));
         store.setReferences(id, effectiveReferences);
       }
+      if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
       const key = await ensureKey(session, groupId);
       const references = effectiveReferences.map((mediaId) => store.media(mediaId, session.user_id));
       if (references.some((item) => !item)) throw new GatewayError('参考图已过期，请重新上传。', 400);
       if (chat) {
         const settings = { size, count, aspectRatio, groupId };
-        const answer = parseChatAnswer(await gateway.converse(key, chatPayload(current.model, resolved.conversation, references, settings)));
+        const payload = chatPayload(current.model, resolved.conversation, references, settings);
+        if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
+        originalToken = session.accessToken;
+        liveSession(store, job.sessionHash, userId, { token: originalToken });
+        const answer = parseChatAnswer(await gateway.converse(key, payload));
         const refreshed = store.getMessage(id, session.user_id);
         const proposal = answer.ready ? {
           prompt: answer.prompt, settings, referenceIds: refreshed.referenceIds,
@@ -58,6 +74,9 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey = createK
         store.finishChat(id, answer.reply, proposal);
         return;
       }
+      if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
+      originalToken = session.accessToken;
+      liveSession(store, job.sessionHash, userId, { token: originalToken });
       const answer = await gateway.generate(key, { prompt: resolved.prompt, size, count, references, aspectRatio });
       const images = Array.isArray(answer?.data) ? answer.data : [];
       let saved = 0;
@@ -111,10 +130,16 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey = createK
       active++;
       void (job.runTask ? runTask(job) : run(job));
     }
+    if (!active && !pending.length) {
+      for (const resolve of drainWaiters) resolve();
+      drainWaiters.clear();
+    }
   }
   return {
-    enqueue(job) { pending.push({ ...job, threadId: job.threadId || store.contextJob(job.id)?.threadId || job.id }); schedule(); },
-    enqueueTask(key, runTask) { pending.push({ threadId: key, runTask }); schedule(); },
+    drain,
+    close() { closing = true; return closePromise ??= drain(); },
+    enqueue(job) { if (closing) throw new GatewayError('服务正在停止。', 503); pending.push({ ...job, threadId: job.threadId || store.contextJob(job.id)?.threadId || job.id }); schedule(); },
+    enqueueTask(key, runTask) { if (closing) throw new GatewayError('服务正在停止。', 503); pending.push({ threadId: key, runTask }); schedule(); },
     get limit() { return concurrency; },
     get active() { return active; },
     get waiting() { return pending.length; }

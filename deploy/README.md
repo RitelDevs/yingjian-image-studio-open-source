@@ -36,3 +36,5 @@ node --env-file=.env dist-server/index.mjs
 `images-http.conf`、`images-https.conf`、原 `compose.yaml` 和专用转移/部署脚本属于原实例的操作材料，不属于公开发布包；不要用它们覆盖其他部署。
 
 健康检查、账号验收、切换与回滚步骤均在发布文档中。运行目录及私有配置必须在 Web 静态目录之外。
+
+Visora 的域名、精确回调、来源和独立状态准备见 [VISORA.md](VISORA.md)。示例默认新域不等于生产已经切换；现行入口、配置与运行包以独立核验为准。

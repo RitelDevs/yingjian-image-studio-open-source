@@ -33,3 +33,6 @@ React / React DOM (MIT), Lucide (ISC), Vite (MIT), esbuild (MIT), and Playwright
 The style market images are curated demonstration resources made for this project. Their prompt hashes, model labels and matching recipe versions are recorded in `shared/style-examples.mjs`. Reference/edited examples demonstrate the workflow and are not promises of identical model output.
 
 The browser demonstration image `public/demo/sample.jpg` depicts Vincent van Gogh's flower still life. Other demonstration SVG illustrations in `public/editorial/` and `public/inspiration/` are project assets. Do not replace these examples with private user images in a public source release.
+
+`RitelSI-Cinzel.woff2` preserves the earlier uppercase-only compatibility subset.
+`RitelSI-Cinzel-mixed-case.woff2` contains the native `Ritel.SI` glyphs used by the current wordmark. Both are subsets of Cinzel pinned to weight 400 and licensed under SIL Open Font License 1.1; see `public/fonts/licenses/Cinzel-OFL.txt`.

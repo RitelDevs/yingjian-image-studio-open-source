@@ -44,7 +44,7 @@ async function fixture(options = {}) {
   const submit = (cookie, threadId, patch = {}) => request('/api/chat', { cookie, body: { clientRequestId: crypto.randomUUID(), threadId, prompt: '一把蓝色椅子', groupId: 2, size: '2K', count: 1, references: [], ...patch } });
   const chat = async (cookie, threadId, patch) => { const response = await submit(cookie, threadId, patch); assert.equal(response.status, 202, JSON.stringify(response.data)); return wait(response.data.job.id, cookie); };
   const confirm = (cookie, id, patch = {}) => request(`/api/plans/${id}/confirm`, { cookie, body: { confirmed: true, ...patch } });
-  const stop = async () => { while (app.queue.active) await sleep(10); await new Promise(resolve => app.server.close(resolve)); app.close(); rmSync(directory, { recursive: true, force: true }); };
+  const stop = async () => { while (app.queue.active) await sleep(10); await new Promise(resolve => app.server.close(resolve)); await app.close(); rmSync(directory, { recursive: true, force: true }); };
   return { app, calls, groups, request, login, thread, submit, wait, chat, confirm, stop };
 }
 

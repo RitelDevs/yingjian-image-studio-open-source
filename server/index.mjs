@@ -9,6 +9,8 @@ import { createQueue } from './queue.mjs';
 import { createKeyProvider } from './editor/keys.mjs';
 import { createEditorService } from './editor/service.mjs';
 import { createSSO } from './sso.mjs';
+import { loadSub2apiAccountRuntime } from './sub2api-account-runtime.mjs';
+import { SUB2API_STUDIO_ORIGINS, createDualOriginSub2apiAccount } from './sub2api-account.mjs';
 import { VERSION } from '../shared/version.mjs';
 import { resolveImageGeometry } from '../shared/image-geometry.mjs';
 import { compileStyleRecipe, StyleRecipeError } from './style-recipes.mjs';
@@ -55,29 +57,46 @@ function decodeUpload(value) {
 }
 
 export function createApplication(options = {}) {
+  let account = options.sub2apiAccount ?? null;
+  try {
+    if (options.legacySub2apiAccount) account = createDualOriginSub2apiAccount(account, options.legacySub2apiAccount);
+    return buildApplication(options, account);
+  } catch (error) {
+    for (const item of new Set([options.sub2apiAccount, options.legacySub2apiAccount])) { try { item?.close(); } catch {} }
+    throw error;
+  }
+}
+
+function buildApplication(options, sub2apiAccount) {
   const dataDir = options.dataDir || process.env.DATA_DIR || join(APP_ROOT, 'data');
   const demo = options.demo ?? (process.env.DEMO_MODE === '1' || process.argv.includes('--demo'));
   const integration = options.integration || null;
   if (integration && (demo || !Number.isSafeInteger(integration.maxJobs) || integration.maxJobs < 1)) throw new Error('Invalid integration configuration');
   const cookieName = options.cookieName || (integration ? 'studio_integration_sid' : 'studio_sid');
-  const store = createStore(dataDir);
+  if (sub2apiAccount && (demo || integration || options.ssoEnabled || !SUB2API_STUDIO_ORIGINS.includes(sub2apiAccount.origin) ||
+      ['handle', 'authenticate', 'authorizeSession', 'logout', 'close'].some(key => typeof sub2apiAccount[key] !== 'function'))) throw new Error('Invalid mixed Sub2API account configuration');
   const gateway = options.gateway || createGateway(process.env.GATEWAY_BASE_URL || 'http://127.0.0.1:8080', process.env.IMAGE_MODEL || 'gpt-image-2.5', demo);
   const chatModel = options.chatModel || process.env.CHAT_MODEL || 'gpt-6-luna';
-  const publicOrigin = options.publicOrigin || process.env.PUBLIC_ORIGIN || '';
-  const configuredOrigins = options.publicOrigins ?? (process.env.PUBLIC_ORIGINS ? process.env.PUBLIC_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : null);
+  const publicOrigin = options.publicOrigin ?? process.env.PUBLIC_ORIGIN ?? sub2apiAccount?.origin ?? '';
+  const configuredOrigins = options.publicOrigins ?? (process.env.PUBLIC_ORIGINS ? process.env.PUBLIC_ORIGINS.split(',').map(value => value.trim()).filter(Boolean) : sub2apiAccount ? (sub2apiAccount.origins ?? [sub2apiAccount.origin]) : null);
   const publicOrigins = [...new Set(configuredOrigins || (publicOrigin ? [publicOrigin] : []))];
   for (const origin of configuredOrigins || []) { const url = new URL(origin); if (url.protocol !== 'https:' || url.origin !== origin) throw new Error('PUBLIC_ORIGINS requires canonical HTTPS origins.'); }
   if (publicOrigin && !publicOrigins.includes(publicOrigin)) throw new Error('PUBLIC_ORIGIN must be in PUBLIC_ORIGINS.');
+  const accountOrigins = sub2apiAccount?.origins ?? (sub2apiAccount ? [sub2apiAccount.origin] : []);
+  if (sub2apiAccount && (publicOrigin !== sub2apiAccount.origin || publicOrigins.length !== accountOrigins.length ||
+      publicOrigins.some(origin => !accountOrigins.includes(origin)))) throw new Error('Central account mode requires the exact configured consumer origins');
+  const store = createStore(dataDir);
   function requestPublicOrigin(req) {
     if (!configuredOrigins) return publicOrigin || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
     const origin = publicOrigins.find(value => new URL(value).host === req.headers.host);
     if (!origin) throw new GatewayError('当前网站域名未配置。', 403);
     return origin;
   }
-  const sso = createSSO({ enabled: !demo && !integration && (options.ssoEnabled ?? process.env.SSO_ENABLED === '1'), publicOrigin, publicOrigins, requestPublicOrigin, store, gateway, sources: options.ssoSources ?? (process.env.SSO_SOURCES ? JSON.parse(process.env.SSO_SOURCES) : undefined) });
-  const ensureKey = createKeyProvider(store, gateway);
-  const queue = createQueue(store, gateway, Math.max(1, Math.min(10, Math.floor(Number(options.concurrency ?? process.env.JOB_CONCURRENCY) || 2))), ensureKey);
-  const editor = createEditorService({ store, gateway, queue, ensureKey, chatModel, groupList });
+  const sso = sub2apiAccount ? { sourcesFor: () => [], handle: async () => false } : createSSO({ enabled: !demo && !integration && (options.ssoEnabled ?? process.env.SSO_ENABLED === '1'), publicOrigin, publicOrigins, requestPublicOrigin, store, gateway, sources: options.ssoSources ?? (process.env.SSO_SOURCES ? JSON.parse(process.env.SSO_SOURCES) : undefined) });
+  const authorizeSession = sub2apiAccount ? (hash, userId) => sub2apiAccount.authorizeSession(store, hash, userId) : undefined;
+  const ensureKey = createKeyProvider(store, gateway, { authorizeSession });
+  const queue = createQueue(store, gateway, Math.max(1, Math.min(10, Math.floor(Number(options.concurrency ?? process.env.JOB_CONCURRENCY) || 2))), ensureKey, { authorizeSession });
+  const editor = createEditorService({ store, gateway, queue, ensureKey, chatModel, groupList, authorizeSession });
   const cleanupTimer = setInterval(() => { store.cleanup(); editor.cleanup(); }, 60 * 60_000);
   cleanupTimer.unref();
   store.cleanup();
@@ -90,6 +109,7 @@ export function createApplication(options = {}) {
     if (integration && user?.role !== 'admin') throw new GatewayError('这个入口仅供管理员账号联调，请使用管理员账号登录。', 403);
   }
   async function authenticated(req) {
+    if (sub2apiAccount) return sub2apiAccount.authenticate(store, req);
     const row = store.session(sid(req, cookieName));
     if (!row) throw new GatewayError('请先登录。', 401);
     if (row.access_expires < Date.now() + 60_000 && row.refreshToken) {
@@ -119,7 +139,8 @@ export function createApplication(options = {}) {
   }
   async function api(req, res, path) {
     if (path === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true, version: VERSION, ...(options.previewId ? { previewId: options.previewId } : {}), queue: { active: queue.active, waiting: queue.waiting, limit: queue.limit } });
-    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, chatModel, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)) });
+    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, chatModel, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
+    if (sub2apiAccount && /^\/api\/(?:login(?:[/-]|$)|demo-login$|sso(?:[/-]|$))/.test(path)) throw new GatewayError('请使用账号中心登录。', 404);
     if (path === '/api/login-config' && req.method === 'GET') { requestPublicOrigin(req); return send(res, 200, await gateway.loginConfig()); }
     if (await sso.handle(req, res, path, { send, parseJson, sessionCookie: cookie })) return;
     checkOrigin(req);
@@ -160,17 +181,18 @@ export function createApplication(options = {}) {
     const editorRequest = /^\/api\/editor\/chat\/([^/]+)$/.exec(path);
     if (editorRequest && req.method === 'GET') return send(res, 200, editor.get(session, editorRequest[1]));
     if (path === '/api/logout' && req.method === 'POST') {
+      if (sub2apiAccount) return sub2apiAccount.logout(store, req, res);
       store.db.prepare('DELETE FROM sessions WHERE id_hash=?').run(session.id_hash);
       if (session.refreshToken) void gateway.logout(session.refreshToken).catch(() => {});
       return send(res, 200, { ok: true }, { 'set-cookie': cookie('') + '; Max-Age=0' });
     }
     if (path === '/api/me' && req.method === 'GET') {
-      const user = await gateway.profile(session.accessToken);
+      const user = await gateway.profile(session.accessToken, session.context);
       if (!user || user.id !== session.user_id || user.status === 'disabled') throw new GatewayError('账号不可用。', 403);
       checkTestAccount(user);
       store.updateSession(session, { user });
-      const groups = groupList(await gateway.groups(session.accessToken));
-      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, chatModel, demo, integration, features: { styleOptimization: true } });
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
+      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, chatModel, demo, integration, features: { styleOptimization: true }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
     }
     if (path === '/api/threads' && req.method === 'GET') return send(res, 200, { threads: store.threads(session.user_id) });
     if (path === '/api/threads' && req.method === 'POST') return send(res, 201, { thread: store.createThread(session.user_id) });
@@ -199,7 +221,7 @@ export function createApplication(options = {}) {
     if (mediaMatch && req.method === 'GET') {
       const item = store.media(mediaMatch[1], session.user_id);
       if (!item) throw new GatewayError('图片已过期或不存在。', 404);
-      res.writeHead(200, { 'content-type': item.mime, 'content-length': item.bytes.length, 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff' });
+      res.writeHead(200, { 'content-type': item.mime, 'content-length': item.bytes.length, 'cache-control': sub2apiAccount ? 'private, no-store' : 'private, max-age=3600', 'x-content-type-options': 'nosniff' });
       return res.end(item.bytes);
     }
     const revokeStyle = /^\/api\/style-selections\/([a-f0-9-]{36})\/revoke$/.exec(path);
@@ -251,7 +273,7 @@ export function createApplication(options = {}) {
         if (error instanceof StyleRecipeError) throw new GatewayError(error.message, error.status, false, error.reason);
         throw error;
       }
-      const groups = groupList(await gateway.groups(session.accessToken));
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
       if (!groups.some(item => item.id === groupId)) throw new GatewayError(`当前账号不能使用所选生图分组。${CONTACT}`, 403);
       // Another request or a deletion may have completed while permissions were checked.
       assertStyleActive();
@@ -308,7 +330,7 @@ export function createApplication(options = {}) {
       }
       const prompt = plan.proposal.style ? plan.proposal.prompt : (typeof input.prompt === 'string' ? input.prompt.trim() : plan.proposal.prompt);
       if (!prompt || prompt.length > 4000) throw new GatewayError('确认提示词须为 1～4000 字。', 400);
-      const groups = groupList(await gateway.groups(session.accessToken));
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
       // Re-read after awaiting the gateway: a new chat or another confirmation may have won the race.
       plan = store.contextJob(id);
       if (!plan || plan.userId !== session.user_id) throw new GatewayError('方案已过期，请重新整理。', 404);
@@ -362,7 +384,7 @@ export function createApplication(options = {}) {
       try { geometry = resolveImageGeometry(size, input.aspectRatio ?? 'auto'); }
       catch (error) { throw new GatewayError(error.message, 400); }
       if (integration && count !== 1) throw new GatewayError('本轮联调每次只生成 1 张图片。', 400);
-      const groups = groupList(await gateway.groups(session.accessToken));
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
       if (!groups.some((item) => item.id === groupId)) throw new GatewayError(`当前账号不能使用所选生图分组。${CONTACT}`, 403);
       const refs = Array.isArray(input.references) ? input.references : [];
       if (refs.length > 4) throw new GatewayError('最多上传 4 张参考图。', 400);
@@ -406,29 +428,74 @@ export function createApplication(options = {}) {
     throw new GatewayError('页面不存在。', 404);
   }
   const dist = options.distDir ? resolve(options.distDir) : join(APP_ROOT, 'dist');
-  const mimeTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
-  const server = createServer(async (req, res) => {
+  const mimeTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+  let closing = false, closePromise;
+  const inFlight = new Set();
+  async function handleRequest(req, res) {
     const path = new URL(req.url, 'http://localhost').pathname;
     try {
-      if (path.startsWith('/api/')) return await api(req, res, path);
+      if (closing) throw new GatewayError('服务正在更新，请稍后再试。', 503);
+      if (sub2apiAccount && !(path === '/api/health' && req.method === 'GET') && await sub2apiAccount.handle(req, res)) return;
+      if (path === '/api' || path.startsWith('/api/')) return await api(req, res, path);
+      if (path === '/auth' || path.startsWith('/auth/') || path === '/v1' || path.startsWith('/v1/')) throw new GatewayError('页面不存在。', 404);
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new GatewayError('页面不存在。', 404);
       const target = resolve(dist, `.${path === '/' ? '/index.html' : path}`);
-      const file = target.startsWith(dist + sep) && (() => { try { return statSync(target).isFile(); } catch { return false; } })() ? target : join(dist, 'index.html');
+      const found = target.startsWith(dist + sep) && (() => { try { return statSync(target).isFile(); } catch { return false; } })();
+      const file = found ? target : join(dist, '404.html');
       const bytes = readFileSync(file);
-      res.writeHead(200, { 'content-type': mimeTypes[extname(file)] || 'application/octet-stream', 'content-length': bytes.length, 'cache-control': file.endsWith('index.html') ? 'no-store' : 'public, max-age=86400' });
+      res.writeHead(found ? 200 : 404, { 'content-type': mimeTypes[extname(file)] || 'application/octet-stream', 'content-length': bytes.length, 'cache-control': !found || file.endsWith('index.html') ? 'no-store' : 'public, max-age=86400' });
       res.end(req.method === 'HEAD' ? undefined : bytes);
     } catch (error) {
       if (res.headersSent) return res.end();
       const known = error instanceof GatewayError;
       send(res, known ? error.status : 500, { error: known ? error.message : '服务暂时不可用，请联系管理员微信 panrui12。' });
     }
+  }
+  const server = createServer((req, res) => {
+    const operation = handleRequest(req, res);
+    inFlight.add(operation);
+    operation.finally(() => inFlight.delete(operation)).catch(() => {});
   });
-  return { server, store, queue, editor, close: () => { clearInterval(cleanupTimer); editor.close(); store.close(); } };
+  async function close() {
+    if (closePromise) return closePromise;
+    closing = true;
+    clearInterval(cleanupTimer);
+    closePromise = (async () => {
+      const stopped = server.listening ? new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())) : Promise.resolve();
+      await Promise.all([...inFlight]);
+      await stopped;
+      await queue.close();
+      await editor.close();
+      store.close();
+      await sub2apiAccount?.close();
+    })();
+    return closePromise;
+  }
+  return { server, store, queue, editor, close };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const app = createApplication();
-  const port = Number(process.env.PORT) || 8788;
-  const host = process.env.HOST || '127.0.0.1';
-  app.server.listen(port, host, () => console.log(`Image studio ready at http://${host}:${port}`));
+  if (process.env.LEGACY_SUB2API_ACCOUNT_CONFIG && !process.env.SUB2API_ACCOUNT_CONFIG) throw new Error('Legacy Studio consumer requires the primary configuration');
+  if (process.env.SUB2API_ACCOUNT_CONFIG && (process.env.RITEL_ACCOUNT_CONFIG || process.env.DEMO_MODE === '1' || process.env.SSO_ENABLED === '1')) throw new Error('Central account mode cannot share another login runtime');
+  let sub2apiAccount = process.env.SUB2API_ACCOUNT_CONFIG ? await loadSub2apiAccountRuntime(process.env.SUB2API_ACCOUNT_CONFIG) : null;
+  if (process.env.LEGACY_SUB2API_ACCOUNT_CONFIG) {
+    let legacy;
+    try {
+      legacy = await loadSub2apiAccountRuntime(process.env.LEGACY_SUB2API_ACCOUNT_CONFIG);
+      sub2apiAccount = createDualOriginSub2apiAccount(sub2apiAccount, legacy);
+    } catch (error) { await sub2apiAccount?.close(); await legacy?.close(); throw error; }
+  }
+  if (process.argv.includes('--check-config')) {
+    if (process.argv.length !== 3 || !sub2apiAccount) throw new Error('Explicit central account configuration required for --check-config');
+    await sub2apiAccount.close();
+    console.log('Studio central account configuration valid; consumer schema initialized; no listener, native request or business database opened');
+  } else {
+    const app = createApplication({ sub2apiAccount });
+    const port = Number(process.env.PORT) || 8788;
+    const host = process.env.HOST || '127.0.0.1';
+    app.server.listen(port, host, () => console.log(`Image studio ready at http://${host}:${port}`));
+    for (const signal of ['SIGTERM', 'SIGINT']) process.once(signal, () => {
+      void app.close().catch(() => { console.error('Studio shutdown did not complete; preserve current state before restart'); process.exitCode = 1; });
+    });
+  }
 }

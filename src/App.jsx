@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownToLine, ArrowRight, Check, Clock3, Copy, ImagePlus, Layers3,
   LoaderCircle, LogOut, Menu, Paperclip, Plus, RefreshCw,
@@ -25,6 +25,8 @@ import { imageSettingsForRetry, draftAspectRatio } from '../shared/image-geometr
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
 import { getStyleExample } from '../shared/style-examples.mjs';
 import ImageEditor from './editor-ui/ImageEditor.jsx';
+import { call, configureStudio, sub2apiClient, apiForAccount, StudioApiContext, loginPath, accountPath } from './studio-api.js';
+import { installStudioSessionReactivation } from './session-reactivation.mjs';
 
 const CONTACT = 'panrui12';
 const REGISTER_URL = 'https://api-us.ritelt.com/register?aff=885EB5776PEU';
@@ -33,17 +35,6 @@ const statusText = {
   queued: '排队中', running: '生成中', done: '已完成', partial: '部分完成',
   unknown: '待核对', failed: '未完成'
 };
-
-async function call(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: 'same-origin',
-    ...options,
-    headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...options.headers }
-  });
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(json.error || '连接失败，请稍后重试。');
-  return json;
-}
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -166,7 +157,15 @@ function Login({ onLogin, demo, integration, embedded = false }) {
   </div>;
 }
 
-function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLogout, open, setOpen, busy, onOpenMarket, marketOpen, onOpenEditor, editorOpen }) {
+function AccountAvatar({ user, accountOrigin }) {
+  const [failed, setFailed] = useState(null);
+  // Only the configured central avatar endpoint can supply an image URL.
+  const url = user.avatarUrl === accountOrigin + '/account/api/avatars/current' ? user.avatarUrl : null;
+  const fallback = (user.nickname || user.username || user.email || '用').slice(0, 1).toUpperCase();
+  return url && failed !== url ? <img src={url} alt="" width="32" height="32" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} onError={() => setFailed(url)} /> : fallback;
+}
+
+function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLogout, open, setOpen, busy, onOpenMarket, marketOpen, onOpenEditor, editorOpen, accountOrigin }) {
   const [search, setSearch] = useState('');
   const selectedIndex = editorOpen ? 2 : marketOpen ? 1 : 0;
   const visibleThreads = threads.filter(item => item.title.toLowerCase().includes(search.toLowerCase()));
@@ -197,7 +196,7 @@ function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLo
       </div>
       <div className="sidebar-bottom">
         <div className="retention"><Clock3 size={15} /> 作品保留 7 天</div>
-        <div className="account-row"><div className="avatar">{(user.username || user.email || '用').slice(0, 1).toUpperCase()}</div><div className="account-meta"><strong>{user.username || user.email}</strong><small>{user.email}</small></div><button className="icon-button logout" onClick={onLogout} title="退出登录" aria-label="退出登录"><LogOut size={18} /></button></div>
+        <div className="account-row"><div className="avatar">{accountOrigin ? <a href={accountPath(accountOrigin, 'profile')} onClick={event => { event.currentTarget.href = accountPath(accountOrigin, 'profile'); }} aria-label="修改头像和昵称"><AccountAvatar user={user} accountOrigin={accountOrigin} /></a> : (user.username || user.email || '用').slice(0, 1).toUpperCase()}</div><div className="account-meta"><strong>{accountOrigin ? <a href={accountPath(accountOrigin, 'profile')} onClick={event => { event.currentTarget.href = accountPath(accountOrigin, 'profile'); }}>{user.nickname || user.username || user.email}</a> : user.username || user.email}</strong><small>{user.email}</small></div><button className="icon-button logout" disabled={accountOrigin ? busy : undefined} onClick={onLogout} title="退出登录" aria-label="退出登录"><LogOut size={18} /></button></div>
       </div>
     </aside>
   </>;
@@ -214,7 +213,7 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
     {item.aspectRatio && item.aspectRatio !== 'auto' && <div className="turn-settings">{item.size} · {item.aspectRatio}</div>}
     {item.referenceIds?.length > 0 && <div className="reference-strip">{item.referenceIds.map((id, index) => <div className="reference-image-item" key={id}><button type="button" className="reference-image-open" title="查看参考图大图" aria-label={`查看参考图 ${index + 1} 大图`} onClick={() => onOpenImage({ id, url: `/api/media/${id}`, threadId: item.threadId, name: `参考图-${index + 1}` })}><img src={`/api/media/${id}`} alt={`参考图 ${index + 1}`} /></button><button className="reference-to-editor" title="放入工作台" aria-label={`将参考图 ${index + 1} 放入工作台`} onClick={() => onEditImage({ id, url: `/api/media/${id}`, name: `参考图-${index + 1}` })}>放入工作台</button></div>)}</div>}
     <div className="response-block">
-      <div className="response-heading"><span className="result-symbol"><Sparkles size={17} /></span><strong>映间</strong><span className={`status status-${item.status}`}>{pending && <LoaderCircle className="spin" size={13} />}{chat && item.recovery === 'style_template' ? '方案未整理成功' : chat ? ({ queued: '等待回复', running: '正在思考', done: '已回复', unknown: '回复待核对', failed: '回复失败' }[item.status] || item.status) : statusText[item.status] || item.status}</span></div>
+      <div className="response-heading"><span className="result-symbol"><Sparkles size={17} /></span><strong>Ritel.SI Visora</strong><span className={`status status-${item.status}`}>{pending && <LoaderCircle className="spin" size={13} />}{chat && item.recovery === 'style_template' ? '方案未整理成功' : chat ? ({ queued: '等待回复', running: '正在思考', done: '已回复', unknown: '回复待核对', failed: '回复失败' }[item.status] || item.status) : statusText[item.status] || item.status}</span></div>
       {pending && <div className="progress-line"><span />{chat ? (item.status === 'queued' ? '正在等待前一轮完成…' : item.context?.styleOptimization ? '正在按专业规则推敲构图、光影与表现方式…' : '正在理解需求、整理回复…') : item.status === 'queued' ? '正在排队，空出位置后会自动开始，无需重复提交。' : '正在生成图片'}</div>}
       {chat && item.assistantText && <p className="assistant-reply">{item.assistantText}</p>}
       {chat && item.proposal && <ProposalCard item={item} groupName={groupName} confirming={confirming} blocked={blocked} onConfirm={onConfirm} />}
@@ -229,7 +228,11 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
   </article>;
 }
 
-function Workspace({ initial, onLogout }) {
+function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
+  const api = useMemo(() => apiForAccount(initial.user.id), [initial.user.id]);
+  const call = api.call;
+  const sessionBlocked = Boolean(accountOrigin && sessionPhase !== 'ready');
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const [user, setUser] = useState(initial.user);
   const [groups, setGroups] = useState(initial.groups);
   const conversations = useConversations({ call, userId: user.id, defaultGroupId: initial.groups[0]?.id ?? null, fileToDataUrl });
@@ -367,7 +370,17 @@ function Workspace({ initial, onLogout }) {
     if (proposal) { proposal.focus({ preventScroll: true }); pendingStyleFocus.current = null; }
   }, [marketOpen, messages, loading]);
   useEffect(() => { if (messages.length) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [activeId, messages.length]);
-  useEffect(() => { const timer = setInterval(() => { void call('/api/me').then((data) => { setUser(data.user); setGroups(data.groups); }).catch(() => {}); }, 60_000); return () => clearInterval(timer); }, []);
+  useEffect(() => { if (accountOrigin) { setUser(initial.user); setGroups(initial.groups); } }, [accountOrigin, initial.user, initial.groups]);
+  useEffect(() => {
+    if (sessionBlocked) return;
+    let active = true;
+    const timer = setInterval(() => { void call('/api/me').then(data => {
+      if (!active) return;
+      if (data.user.id !== initial.user.id) { onLogout(); return; }
+      setUser(data.user); setGroups(data.groups);
+    }).catch(error => { if (active && !accountOrigin && error.status === 401) onLogout(); }); }, 60_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [call, accountOrigin, sessionBlocked, initial.user.id, onLogout]);
   function updatePrompt(value) { editDraft({ prompt: value }); }
   function useImage(image) {
     replaceRefs([{ mediaId: image.id, objectUrl: image.url, name: '上一张作品' }]);
@@ -379,10 +392,19 @@ function Workspace({ initial, onLogout }) {
     editDraft({ ...imageSettingsForRetry(item), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
     textInput.current?.focus();
   }
-  async function logout() { await call('/api/logout', { method: 'POST', body: '{}' }).catch(() => {}); onLogout(); }
+  async function logout() {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    try {
+      if (accountOrigin) await sub2apiClient.logout(initial.user.id);
+      else await call('/api/logout', { method: 'POST', body: '{}' });
+      onLogout();
+    } catch (error) { setNotice(error.message || '退出结果尚未确认，请重新检查登录状态。'); }
+    finally { setLogoutBusy(false); }
+  }
   async function copy(value) { await navigator.clipboard.writeText(value).then(() => setNotice('已复制提示词')).catch(() => setNotice('复制失败')); }
-  return <div className={`workspace${editorOpen ? ' ed-is-open' : ''}`}>
-    <Sidebar threads={threads} activeId={activeId} choose={chooseThread} create={createThread} remove={remove} rename={rename} user={user} onLogout={logout} open={sidebarOpen} setOpen={setSidebarOpen} busy={creating} onOpenMarket={openMarket} marketOpen={marketOpen} onOpenEditor={() => openEditor()} editorOpen={editorOpen} />
+  return <StudioApiContext.Provider value={api}><div className={`workspace${editorOpen ? ' ed-is-open' : ''}`} inert={sessionBlocked ? true : undefined}>
+    <Sidebar threads={threads} activeId={activeId} choose={chooseThread} create={createThread} remove={remove} rename={rename} user={user} onLogout={logout} open={sidebarOpen} setOpen={setSidebarOpen} busy={creating || logoutBusy || sessionBlocked} accountOrigin={accountOrigin} onOpenMarket={openMarket} marketOpen={marketOpen} onOpenEditor={() => openEditor()} editorOpen={editorOpen} />
     <div className="workspace-main" style={editorOpen ? { display: 'none' } : undefined}>
       <a className="skip-link" href="#main-content">跳转到创作对话</a>
       <header className="topbar"><div className="topbar-left"><button className="icon-button menu-toggle" title="打开创作列表" aria-label="打开创作列表" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="breadcrumb"><span>创作空间</span><span className="breadcrumb-slash">/</span><strong>{marketOpen ? '风格市场' : threads.find((item) => item.id === activeId)?.title || '新的创作'}</strong></div></div><div className="topbar-right"><button className="ed-open-top" onClick={() => openEditor()}><SlidersHorizontal size={16} /><span>图片编辑台</span></button><span className="model-chip"><span className="model-dot" /> Images 2.5</span><span className="balance"><Wallet size={16} /> 余额 <strong>{Number(user.balance || 0).toFixed(2)}</strong></span></div></header>
@@ -426,16 +448,50 @@ function Workspace({ initial, onLogout }) {
     </div>
     {editorVisited && <ImageEditor key={user.id} user={user} groups={groups} defaultGroupId={groupId} demo={initial.demo} active={editorOpen} source={editorSource} onBack={closeEditor} onReturnReference={returnEditorReference} />}
     {detailImage && <ImageViewer image={detailImage} onClose={() => setDetailImage(null)} onEdit={image => { setDetailImage(null); openEditor(image); }} />}
-  </div>;
+  </div></StudioApiContext.Provider>;
+}
+
+function SessionLoading() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => setVisible(true), 180); return () => clearTimeout(timer); }, []);
+  return <div className="loading-screen" role="status" aria-label="正在检查登录状态"><Logo />{visible && <LoaderCircle className="spin" size={22} />}</div>;
+}
+
+function Sub2apiApp({ config, exploring, enterWorkspace }) {
+  const [state, setState] = useState(() => sub2apiClient.snapshot);
+  const refresh = useCallback(() => { void sub2apiClient.refresh().catch(() => {}); }, []);
+  const onLogout = useCallback(() => {}, []);
+  useEffect(() => {
+    const unsubscribe = sub2apiClient.subscribe(setState);
+    void sub2apiClient.start().catch(() => {});
+    const resume = installStudioSessionReactivation({ refresh });
+    return () => { unsubscribe(); resume.dispose(); };
+  }, [refresh]);
+  if (!state.account && ['loading', 'checking'].includes(state.phase)) return <SessionLoading />;
+  if (!state.account && state.phase === 'unavailable') return <div className="loading-screen account-unavailable"><Logo /><p role="status">{state.error}</p><button className="demo-button" onClick={refresh}>重新检查</button></div>;
+  if (state.account && exploring) return <Showcase authenticated onEnter={enterWorkspace} />;
+  if (state.account) return <>
+    {state.phase !== 'ready' && <div className="notice" role="status">{state.phase === 'checking' ? '正在检查登录状态…' : state.error}<button className="demo-button" onClick={refresh} disabled={state.phase === 'checking'}>重新检查</button></div>}
+    <Workspace key={state.account.user.id + ':' + state.ownerVersion} initial={state.account} accountOrigin={config.accountOrigin} sessionPhase={state.phase} onLogout={onLogout} />
+  </>;
+  return <Showcase authenticated={false} onEnter={refresh}>
+    <div className="login-shell login-embedded"><main className="login-main" id="main-content"><section className="login-form-column"><div className="login-content">
+      <div className="login-eyebrow">YOUR SPACE. YOUR IDEAS.</div>
+      <h2 className="login-title">欢迎回来。</h2>
+      <p className="login-subtitle">登录账号，进入 Ritel.SI Visora 创作空间。</p>
+      <a className="primary-button login-button" href={loginPath()} onClick={event => { event.currentTarget.href = loginPath(); }}><span>使用账号登录</span><ArrowRight size={18} /></a>
+      <div className="login-help">还没有账号？<a className="login-register-link" href={loginPath('register')} onClick={event => { event.currentTarget.href = loginPath('register'); }}>注册账号</a></div>
+    </div></section></main></div>
+  </Showcase>;
 }
 
 let initialization;
 function initializeAccount() {
   if (!initialization) initialization = (async () => {
-    const [config, account] = await Promise.all([
-      call('/api/config').catch(() => ({ demo: false })),
-      call('/api/me').catch(() => null)
-    ]);
+    const config = await call('/api/config');
+    configureStudio(config);
+    if (config.accountMode === 'sub2api') return { config, account: null, automatic: false };
+    const account = await call('/api/me').catch(() => null);
     if (account) return { config, account, automatic: false };
     const automatic = await tryAutoLogin(config.ssoSources, call);
     return { config, account: automatic ? await call('/api/me').catch(() => null) : null, automatic };
@@ -447,6 +503,8 @@ export default function App() {
   const [account, setAccount] = useState(null);
   const [config, setConfig] = useState({ demo: false });
   const [loading, setLoading] = useState(true);
+  const [initialError, setInitialError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const [exploring, setExploring] = useState(['#explore', '#showcase-works', '#showcase-workflow', '#account-entry'].includes(location.hash));
   useEffect(() => {
     const update = () => setExploring(['#explore', '#showcase-works', '#showcase-workflow', '#account-entry'].includes(location.hash));
@@ -469,10 +527,12 @@ export default function App() {
       if (!active) return;
       setConfig(result.config); setAccount(result.account);
       if (result.automatic && result.account) enterWorkspace();
-    }).finally(() => { if (active) setLoading(false); });
+    }).catch(() => { if (active) { initialization = null; setInitialError('登录配置暂不可用，请重新检查。'); } }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
-  if (loading) return <div className="loading-screen"><Logo /><LoaderCircle className="spin" size={22} /></div>;
+  }, [attempt]);
+  if (loading) return <SessionLoading />;
+  if (initialError) return <div className="loading-screen account-unavailable"><Logo /><p role="status">{initialError}</p><button className="demo-button" onClick={() => { setInitialError(''); setLoading(true); setAttempt(value => value + 1); }}>重新检查</button></div>;
+  if (config.accountMode === 'sub2api') return <Sub2apiApp config={config} exploring={exploring} enterWorkspace={enterWorkspace} />;
   if (!account || exploring) return <Showcase authenticated={Boolean(account)} onEnter={enterWorkspace}><Login embedded demo={config.demo} integration={config.integration} onLogin={() => { resumeAutoLogin(); enterWorkspace(); void reload(); }} /></Showcase>;
   return <Workspace initial={account} onLogout={() => { pauseAutoLogin(); setAccount(null); }} />;
 }

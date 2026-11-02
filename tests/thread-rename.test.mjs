@@ -17,7 +17,7 @@ async function fixture() {
     const response=await fetch(origin+path,{method,headers:{...(body?{'content-type':'application/json'}:{}),...(token?{cookie:token}:{}),...headers},body:body&&JSON.stringify(body)});
     return{status:response.status,data:await response.json()};
   }
-  return{app,dir,one,other,request,stop:async()=>{await new Promise(r=>app.server.close(r));app.close();rmSync(dir,{recursive:true,force:true});}};
+  return{app,dir,one,other,request,stop:async()=>{await new Promise(r=>app.server.close(r));await app.close();rmSync(dir,{recursive:true,force:true});}};
 }
 
 test('renaming persists across reopen, preserves messages, and cannot be accessed by another user or admin',async()=>{

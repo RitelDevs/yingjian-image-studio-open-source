@@ -1,21 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { StudioApiContext } from '../studio-api.js';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ImagePlus, Images, LoaderCircle, MessageSquare, RefreshCw, Search, X } from 'lucide-react';
 import { conversationImages } from './conversation-images.mjs';
 import './conversation-image-picker.css';
 
-async function readHistory(path, signal) {
-  const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', signal });
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error('登录状态已失效，请重新登录后选择会话图片。');
-    if (response.status === 404) throw new Error('这段会话已删除或过期，请选择其他会话。');
-    throw new Error('暂时无法读取会话，请稍后重试。');
-  }
-  return response.json();
-}
 const dateLabel = time => time ? new Date(time).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '';
 
 export default function ConversationImagePicker({ userId, preferredThreadId, onSelect, onClose }) {
+  const { call } = useContext(StudioApiContext);
   const dialog = useRef(null), search = useRef(null);
   const alive = useRef(true), selecting = useRef(false);
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [listError, setListError] = useState('');
@@ -43,7 +36,7 @@ export default function ConversationImagePicker({ userId, preferredThreadId, onS
   useEffect(() => {
     const controller = new AbortController();
     setListLoading(true); setListError('');
-    void readHistory('/api/threads', controller.signal).then(data => {
+    void call('/api/threads', { signal: controller.signal }).then(data => {
       if (controller.signal.aborted) return;
       const list = (data.threads || []).filter(thread => /^[a-f0-9-]{36}$/i.test(thread.id)).map(thread => ({ ...thread, title: thread.title || '未命名创作' }));
       setThreads(list);
@@ -53,19 +46,19 @@ export default function ConversationImagePicker({ userId, preferredThreadId, onS
     }).catch(error => { if (!controller.signal.aborted) setListError(error.message); })
       .finally(() => { if (!controller.signal.aborted) setListLoading(false); });
     return () => controller.abort();
-  }, [userId, preferredThreadId, listRetry]);
+  }, [call, userId, preferredThreadId, listRetry]);
   useEffect(() => {
     setSelectedId(null); setImageStates({}); setImportError('');
     if (!threadId) { setContent({ id: null, images: [], loading: false, error: '' }); return; }
     const controller = new AbortController();
     setContent({ id: threadId, images: [], loading: true, error: '' });
-    void readHistory(`/api/threads/${threadId}`, controller.signal).then(data => {
+    void call(`/api/threads/${threadId}`, { signal: controller.signal }).then(data => {
       if (!controller.signal.aborted) setContent({ id: threadId, images: conversationImages(data.messages), loading: false, error: '' });
     }).catch(error => {
       if (!controller.signal.aborted) setContent({ id: threadId, images: [], loading: false, error: error.message });
     });
     return () => controller.abort();
-  }, [threadId, imageRetry]);
+  }, [call, threadId, imageRetry]);
 
   function close() { if (!selecting.current) onClose(); }
   function containKeyboard(event) {

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { StudioApiContext } from '../studio-api.js';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { boundedChatHistory, canApplyReply, operationSummary, readEditorChat, submitEditorChat } from './editor-api.mjs';
 
 const terminal = new Set(['done', 'failed', 'unknown']);
@@ -18,6 +19,7 @@ const delay = (ms, signal) => new Promise((resolve, reject) => {
 });
 
 export function useEditorChat({ userId, editor, groupId }) {
+  const api = useContext(StudioApiContext);
   const key = `yingjian-editor-chat:${userId}`;
   const [conversations, setConversations] = useState(() => readSaved(key));
   const records = useRef(conversations);
@@ -68,7 +70,7 @@ export function useEditorChat({ userId, editor, groupId }) {
     let result = first;
     for (let i = 0; i < 150; i++) {
       if (signal.aborted || !mounted.current) return;
-      if (!result) result = await readEditorChat(requestId, signal);
+      if (!result) result = await readEditorChat(requestId, signal, api.call);
       if (terminal.has(result.status)) { finish(docId, id, result); return; }
       update(docId, id, { status: result.status === 'queued' ? 'queued' : 'running', requestId });
       await delay(1200, signal);
@@ -95,7 +97,7 @@ export function useEditorChat({ userId, editor, groupId }) {
         return false;
       }
       submitted = true;
-      const result = await submitEditorChat({ clientRequestId: id, ...snapshot, groupId, message: message.trim(), history: boundedChatHistory(records.current[docId]) }, controller.signal);
+      const result = await submitEditorChat({ clientRequestId: id, ...snapshot, groupId, message: message.trim(), history: boundedChatHistory(records.current[docId]) }, controller.signal, api.call);
       if (!result.requestId) throw new Error('没有收到请求编号，暂时不能确认回复状态。请勿重复发送。');
       requestId = result.requestId;
       update(docId, id, { requestId });

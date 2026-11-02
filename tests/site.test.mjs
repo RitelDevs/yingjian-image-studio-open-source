@@ -66,7 +66,7 @@ async function setup(overrides = {}) {
   }
   async function stop() {
     await new Promise((resolve) => app.server.close(resolve));
-    app.close();
+    await app.close();
     rmSync(directory, { force: true, recursive: true });
   }
   return { app, calls, directory, origin, request, login, waitJob, stop };

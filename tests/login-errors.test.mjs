@@ -75,6 +75,6 @@ test('real login endpoint propagates password errors, creates no session and sti
     assert.equal(app.store.db.prepare('SELECT count(*) AS n FROM messages').get().n,0);
     assert.ok(calls.every(path=>path==='/api/v1/auth/login'));
   } finally {
-    await new Promise(resolve=>app.server.close(resolve));app.close();await new Promise(resolve=>upstream.close(resolve));rmSync(directory,{recursive:true,force:true});
+    await new Promise(resolve=>app.server.close(resolve));await app.close();await new Promise(resolve=>upstream.close(resolve));rmSync(directory,{recursive:true,force:true});
   }
 });

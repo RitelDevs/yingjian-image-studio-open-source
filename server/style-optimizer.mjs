@@ -1,4 +1,5 @@
 import { GatewayError } from './gateway.mjs';
+import { authorizeBoundSession } from './editor/session.mjs';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
 import { STYLE_RECIPE_SOURCES } from './style-recipes.mjs';
 import { getStyleOptimizationProfile, STYLE_OPTIMIZATION_VERSION } from '../shared/style-optimization.mjs';
@@ -122,7 +123,11 @@ export function demoStyleOptimizationAnswer(snapshot) {
   return JSON.stringify({ ready: true, decisions });
 }
 
-export async function runStyleOptimization({ store, gateway, ensureKey, current, session }) {
+export async function runStyleOptimization({ store, gateway, ensureKey, current, session, authorizeSession }) {
+  const sessionHash = session.id_hash, userId = current.userId;
+  const reauthorize = async () => {
+    if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId);
+  };
   const snapshot = current.context.styleOptimization;
   const selectionId = snapshot.styleSelectionId;
   const stillWanted = () => {
@@ -133,7 +138,8 @@ export async function runStyleOptimization({ store, gateway, ensureKey, current,
   };
   const discard = () => store.finishChat(current.id, '整理期间风格已取消或有了更新要求，本次方案已作废。请按当前选择重新发送。', null);
   if (!stillWanted()) { discard(); return; }
-  const available = await gateway.groups(session.accessToken);
+  await reauthorize();
+  const available = await gateway.groups(session.accessToken, session.context);
   const groups = Array.isArray(available) ? available : available?.groups || available?.items || available?.data || [];
   if (!Array.isArray(groups) || !groups.some(item => Number(item.id) === current.groupId && item.platform === 'openai' && item.status !== 'inactive' && item.allow_image_generation !== false)) {
     throw new GatewayError('所选分组已不可用，本次尚未提交专业优化或生图。', 403);
@@ -145,9 +151,13 @@ export async function runStyleOptimization({ store, gateway, ensureKey, current,
   let answer;
   if (snapshot.demo) answer = demoStyleOptimizationAnswer(snapshot);
   else {
+    await reauthorize();
     const key = await ensureKey(session, current.groupId);
     if (!stillWanted()) { discard(); return; }
-    answer = await gateway.converse(key, buildStyleOptimizationRequest(snapshot, settings, references));
+    const payload = buildStyleOptimizationRequest(snapshot, settings, references);
+    await reauthorize();
+    if (!stillWanted()) { discard(); return; }
+    answer = await gateway.converse(key, payload);
   }
   if (!stillWanted()) { discard(); return; }
   const result = parseStyleOptimizationAnswer(answer, snapshot);

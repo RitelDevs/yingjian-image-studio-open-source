@@ -28,7 +28,7 @@ async function fixture() {
     const r=await fetch(`http://127.0.0.1:${app.server.address().port}`+path,{method:body?'POST':'GET',headers:body?{'content-type':'application/json'}:{},body:body&&JSON.stringify(body)});
     return {status:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')};
   };
-  return {calls,app,gateway,request,setSettings:value=>{settings=value},upstreamOrigin:`http://127.0.0.1:${upstream.address().port}`,stop:async()=>{await new Promise(r=>app.server.close(r));app.close();await new Promise(r=>upstream.close(r));rmSync(dir,{recursive:true,force:true});}};
+  return {calls,app,gateway,request,setSettings:value=>{settings=value},upstreamOrigin:`http://127.0.0.1:${upstream.address().port}`,stop:async()=>{await new Promise(r=>app.server.close(r));await app.close();await new Promise(r=>upstream.close(r));rmSync(dir,{recursive:true,force:true});}};
 }
 
 test('public verification config exposes only the public site key and caches settings safely',async()=>{

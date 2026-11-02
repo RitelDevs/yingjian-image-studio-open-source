@@ -1,4 +1,5 @@
 import { GatewayError } from '../gateway.mjs';
+import { authorizeBoundSession, liveSession } from './session.mjs';
 import { createEditorStore } from './store.mjs';
 import { editorPayload } from './planner.mjs';
 import { UUID, parseEditorAnswer, validateEditorRequest } from './validation.mjs';
@@ -6,9 +7,12 @@ import { UUID, parseEditorAnswer, validateEditorRequest } from './validation.mjs
 const CONTACT = '如需核对对话费用，请联系管理员微信 panrui12。';
 const MAX_PENDING_PER_USER = 10;
 
-export function createEditorService({ store, gateway, queue, ensureKey, chatModel, groupList }) {
+export function createEditorService({ store, gateway, queue, ensureKey, chatModel, groupList, authorizeSession }) {
+  if (authorizeSession !== undefined && typeof authorizeSession !== 'function') throw new TypeError('Editor authorization must be a server function');
   const records = createEditorStore(store);
-  let closed = false;
+  let closed = false, closing = false, closePromise;
+  const pendingTasks = new Set();
+  const drain = () => Promise.all([...pendingTasks]).then(() => undefined);
 
   function duplicate(userId, input) {
     const old = records.findRequest(userId, input.clientRequestId);
@@ -25,28 +29,33 @@ export function createEditorService({ store, gateway, queue, ensureKey, chatMode
     try {
       const request = records.byId(userId, id);
       if (!request) throw new GatewayError('编辑请求已过期。', 410, false, 'editor_expired');
-      const session = store.sessionByHash(sessionHash);
-      if (!session || session.user_id !== userId) throw new GatewayError('登录已失效，本次编辑对话未提交。请重新登录。', 401, false, 'authentication_expired');
-      if (session.access_expires < Date.now() + 60_000 && session.refreshToken) {
+      let session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId, { allowExpired: true });
+      if (!authorizeSession && session.access_expires < Date.now() + 60_000 && session.refreshToken) {
+        const predecessor = { accessToken: session.accessToken, refreshToken: session.refreshToken };
         const refreshed = await gateway.refresh(session.refreshToken);
         if (closed) return;
+        session = liveSession(store, sessionHash, userId, { allowExpired: true, token: predecessor.accessToken });
+        if (session.refreshToken !== predecessor.refreshToken) throw new GatewayError('登录状态已变更，请重新登录后再试。', 401, false, 'authentication_changed');
         store.updateSession(session, { accessToken: refreshed.access_token, refreshToken: refreshed.refresh_token || session.refreshToken,
           accessExpires: Date.now() + (Number(refreshed.expires_in) || 900) * 1000 });
       }
       if (!session.accessToken || session.access_expires <= Date.now()) throw new GatewayError('等待期间登录已过期，本次编辑对话未提交。', 401, false, 'authentication_expired');
-      const user = await gateway.profile(session.accessToken);
-      if (!user || user.id !== userId || user.status === 'disabled') throw new GatewayError('账号不可用，本次编辑对话未提交。', 403, false, 'editor_account');
-      const groups = groupList(await gateway.groups(session.accessToken));
+      let originalToken = session.accessToken;
+      const user = await gateway.profile(originalToken, session.context);
+      session = liveSession(store, sessionHash, userId, { token: originalToken });
+      if (!user || user.id !== userId || (authorizeSession ? user.status !== 'active' : user.status === 'disabled')) throw new GatewayError('账号不可用，本次编辑对话未提交。', 403, false, 'editor_account');
+      if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId);
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
       if (!groups.some(item => item.id === request.group_id)) throw new GatewayError('当前账号已不能使用所选分组，本次编辑对话未提交。', 403, false, 'editor_group');
       if (closed) return;
+      if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId);
       const key = await ensureKey(session, request.group_id);
       if (closed) return;
-      // Logout while validation/key creation was in flight must not start a paid model call.
-      const latestSession = store.sessionByHash(sessionHash);
-      if (!latestSession || latestSession.user_id !== userId || latestSession.access_expires <= Date.now()) {
-        throw new GatewayError('登录已失效，本次编辑对话未提交。', 401, false, 'authentication_expired');
-      }
       const payload = editorPayload(request.model, request, records.history(userId, request.document_id, id));
+      // Recheck after key creation, immediately before the single paid call.
+      session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId);
+      originalToken = session.accessToken;
+      liveSession(store, sessionHash, userId, { token: originalToken });
       upstreamStarted = true;
       const raw = await gateway.converse(key, payload, { purpose: 'editor' });
       if (closed) return;
@@ -69,19 +78,34 @@ export function createEditorService({ store, gateway, queue, ensureKey, chatMode
   return {
     records,
     async submit(session, raw) {
-      if (closed) throw new GatewayError('编辑服务正在关闭，请稍后再试。', 503);
+      if (closing) throw new GatewayError('编辑服务正在关闭，请稍后再试。', 503);
       const input = validateEditorRequest(raw);
       const repeated = duplicate(session.user_id, input);
       if (repeated) return repeated;
-      const groups = groupList(await gateway.groups(session.accessToken));
+      const userId = session.user_id, sessionHash = session.id_hash;
+      if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId);
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
+      if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, sessionHash, userId);
       if (!groups.some(item => item.id === input.groupId)) throw new GatewayError('当前账号不能使用所选编辑对话分组。', 403, false, 'editor_group');
       // The first request can have finished while this one awaited the gateway.
-      if (closed) throw new GatewayError('编辑服务正在关闭，请稍后再试。', 503);
+      if (closing) throw new GatewayError('编辑服务正在关闭，请稍后再试。', 503);
       const latest = duplicate(session.user_id, input);
       if (latest) return latest;
       if (records.pendingCount(session.user_id) >= MAX_PENDING_PER_USER) throw new GatewayError('待处理编辑对话过多，请等当前请求完成。', 429, false, 'editor_queue_full');
       const row = store.transaction(() => records.create(session.user_id, input, chatModel));
-      queue.enqueueTask('editor:' + session.user_id + ':' + input.documentId, () => run(row.id, session.user_id, session.id_hash));
+      let finish;
+      const task = new Promise(resolve => { finish = resolve; });
+      pendingTasks.add(task);
+      const complete = () => { pendingTasks.delete(task); finish(); };
+      try {
+        queue.enqueueTask('editor:' + userId + ':' + input.documentId, async () => {
+          try { await run(row.id, userId, sessionHash); } finally { complete(); }
+        });
+      } catch (error) {
+        complete();
+        if (records.markRunning(userId, row.id)) records.finish(userId, row.id, { status: 'failed', error: '服务正在停止，本次编辑对话未提交。', reason: 'editor_closing' });
+        throw error;
+      }
       return { status: 202, result: { ...records.publicResult(row), duplicate: false } };
     },
     get(session, id) {
@@ -96,6 +120,14 @@ export function createEditorService({ store, gateway, queue, ensureKey, chatMode
       return records.publicResult(row);
     },
     cleanup(now) { records.cleanup(now); },
-    close() { if (!closed) { closed = true; records.close(); } }
+    drain,
+    close() {
+      closing = true;
+      if (closePromise) return closePromise;
+      const finish = () => { records.close(); closed = true; };
+      // After queue.close(), finish synchronously before the caller closes SQLite.
+      if (!pendingTasks.size) { finish(); return closePromise = Promise.resolve(); }
+      return closePromise = drain().then(finish);
+    }
   };
 }

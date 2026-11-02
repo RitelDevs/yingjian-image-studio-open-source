@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { StudioApiContext } from '../studio-api.js';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowDownToLine, ChevronDown, Columns2, Images, ImagePlus, LoaderCircle, Maximize, Redo2, RotateCcw, SlidersHorizontal, Sparkles, Undo2, Upload, X } from 'lucide-react';
 import { useImageEditor } from '../editor-core/useImageEditor.js';
 import { AdjustmentsPanel, CropControls } from './AdjustmentsPanel.jsx';
@@ -12,6 +13,7 @@ import { REFERENCE_BYTES } from '../reference-files.js';
 
 const fullCrop = { x: 0, y: 0, width: 1, height: 1 };
 export default function ImageEditor({ user, groups, defaultGroupId, demo, active = true, source, onBack, onReturnReference }) {
+  const { readMedia } = useContext(StudioApiContext);
   const editor = useImageEditor({ userId: user.id });
   const current = useRef(editor); current.current = editor;
   const [issue, setIssue] = useState('');
@@ -54,10 +56,7 @@ export default function ImageEditor({ user, groups, defaultGroupId, demo, active
     sourceFetch.current?.abort();
     const controller = new AbortController(); sourceFetch.current = controller;
     let completed = false;
-    void fetch(source.url, { credentials: 'same-origin', signal: controller.signal }).then(response => {
-      if (!response.ok) throw new Error('这张图片已过期或无法读取，请重新上传。');
-      return response.blob();
-    }).then(blob => {
+    void readMedia(source.url, { signal: controller.signal }).then(blob => {
       if (controller.signal.aborted) return;
       return current.current.loadImage(blob, { name: source.name || '生成作品' }).then(document => { rememberOrigin(document, source); });
     }).catch(error => { if (error.name !== 'AbortError' && !controller.signal.aborted) setIssue(error.message); }).finally(() => { completed = true; });
@@ -65,7 +64,7 @@ export default function ImageEditor({ user, groups, defaultGroupId, demo, active
       controller.abort();
       if (!completed && sourceApplied.current === source.requestId) sourceApplied.current = null;
     };
-  }, [active, source, editor.restoring]);
+  }, [active, source, editor.restoring, readMedia]);
   useEffect(() => {
     if (!active || historyOpen) return;
     const keydown = event => {
@@ -98,9 +97,7 @@ export default function ImageEditor({ user, groups, defaultGroupId, demo, active
     if (!url) throw new Error('图片记录无效，请重新选择。');
     sourceFetch.current?.abort();
     const controller = new AbortController(); sourceFetch.current = controller;
-    const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
-    if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? '登录状态已失效，请重新登录。' : '这张图片已过期或被删除，请选择其他图片。');
-    const blob = await response.blob();
+    const blob = await readMedia(url, { signal: controller.signal });
     if (controller.signal.aborted) throw new DOMException('已取消导入', 'AbortError');
     const result = await current.current.loadImage(blob, { name: image.name });
     if (controller.signal.aborted) return;
@@ -142,7 +139,7 @@ export default function ImageEditor({ user, groups, defaultGroupId, demo, active
       const blob = await editor.exportImage({ format, quality: .92 });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
-      anchor.href = url; anchor.download = `${(state.name || '映间作品').replace(/\.[^.]+$/, '')}-编辑.${format === 'jpeg' ? 'jpg' : 'png'}`;
+      anchor.href = url; anchor.download = `${(state.name || 'Ritel.SI Visora作品').replace(/\.[^.]+$/, '')}-编辑.${format === 'jpeg' ? 'jpg' : 'png'}`;
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 30000);
       setExportOpen(false); setFeedback('图片已导出，原图仍然保留。');
     } catch (error) { setIssue(error.message || '导出失败，请稍后重试。'); }

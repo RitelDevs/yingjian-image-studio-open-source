@@ -62,7 +62,7 @@ async function fixture(options = {}) {
   };
   const stop = async ({ keepDirectory = false } = {}) => {
     await until(() => app.queue.active === 0 && app.queue.waiting === 0);
-    await new Promise(resolve => app.server.close(resolve)); app.close();
+    await new Promise(resolve => app.server.close(resolve)); await app.close();
     if (!keepDirectory) {
       assert.ok(resolve(directory).startsWith(resolve(tmpdir()) + '\\studio-editor-test-') || resolve(directory).startsWith(resolve(tmpdir()) + '/studio-editor-test-'));
       rmSync(directory, { recursive: true, force: true });
@@ -296,7 +296,7 @@ test('restart preserves completed idempotency records and marks interrupted requ
     // Seed an interrupted row after orderly shutdown so the next startup sees crash state.
     await new Promise(resolve => site.app.server.close(resolve)); site.app.editor.close();
     site.app.store.db.prepare("UPDATE editor_requests SET status='running',preview_data_url=? WHERE id=?").run('data:image/png;base64,' + png, interruptedId);
-    site.app.close();
+    await site.app.close();
     site = await fixture({ directory });
     const result = await site.request('/api/editor/chat/' + interruptedId, { cookie });
     assert.equal(result.data.status, 'unknown'); assert.equal(result.data.reason, 'editor_restart');

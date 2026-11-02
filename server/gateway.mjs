@@ -157,12 +157,27 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
   if (base.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(base.hostname)) {
     throw new Error('Gateway must use HTTPS outside localhost');
   }
-  async function request(path, { method = 'GET', token, body, timeout = 15_000 } = {}) {
+  async function request(path, { method = 'GET', token, body, timeout = 15_000, context } = {}) {
+    // Context is only supplied by the verified central native-session backchannel.
+    // Never derive it from a Studio request body or client forwarding headers.
+    const contextHeaders = {};
+    if (context !== undefined) {
+      if (!context || typeof context !== 'object' || Array.isArray(context) ||
+          Object.keys(context).some(key => !['clientIp', 'userAgent', 'acceptLanguage'].includes(key)) ||
+          !isIP(context.clientIp ?? '') || ['userAgent', 'acceptLanguage'].some(key =>
+            typeof context[key] !== 'string' || !context[key].length || Buffer.byteLength(context[key]) > 1024 ||
+            !/^[\x20-\x7e]+$/.test(context[key]))) {
+        throw new GatewayError('中央账号原始会话上下文不可用。', 503, false, 'native_context_invalid');
+      }
+      Object.assign(contextHeaders, {'User-Agent': context.userAgent, 'X-Forwarded-For': context.clientIp,
+        'X-Real-IP': context.clientIp, 'Accept-Language': context.acceptLanguage});
+    }
     let response;
     try {
       response = await fetch(new URL(path, base), {
         method,
-        headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+        headers: { ...contextHeaders, ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+        ...(context !== undefined ? { redirect: 'error' } : {}),
         body: body && JSON.stringify(body),
         signal: AbortSignal.timeout(timeout)
       });
@@ -199,11 +214,11 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
     login: (email, password, turnstileToken = '') => demo ? { access_token: 'demo-token', user: demoUser(), expires_in: 86400 } : request('/api/v1/auth/login', { method: 'POST', body: { email, password, ...(turnstileToken ? { turnstile_token: turnstileToken } : {}) } }),
     login2FA: (tempToken, code) => request('/api/v1/auth/login/2fa', { method: 'POST', body: { temp_token: tempToken, totp_code: code } }),
     refresh: (token) => request('/api/v1/auth/refresh', { method: 'POST', body: { refresh_token: token } }),
-    profile: (token) => demo ? demoUser() : request('/api/v1/auth/me', { token }),
-    groups: (token) => demo ? [{ id: 2, name: '图片创作', platform: 'openai', allow_image_generation: true, rate_multiplier: 1 }] : request('/api/v1/groups/available', { token }),
-    createKey: (token, groupId) => demo ? { id: 1, key: 'demo-key-for-local-preview' } : request('/api/v1/keys', { method: 'POST', token, body: { name: options.keyName || '映间在线生图', group_id: groupId, ...(options.keyExpiresInDays ? { expires_in_days: options.keyExpiresInDays } : {}) } }),
-    getKey: (token, id) => request(`/api/v1/keys/${Number(id)}`, { token }),
-    deleteKey: (token, id) => request(`/api/v1/keys/${Number(id)}`, { method: 'DELETE', token }),
+    profile: (token, context) => demo ? demoUser() : request('/api/v1/auth/me', { token, context }),
+    groups: (token, context) => demo ? [{ id: 2, name: '图片创作', platform: 'openai', allow_image_generation: true, rate_multiplier: 1 }] : request('/api/v1/groups/available', { token, context }),
+    createKey: (token, groupId, context) => demo ? { id: 1, key: 'demo-key-for-local-preview' } : request('/api/v1/keys', { method: 'POST', token, context, body: { name: options.keyName || 'Ritel.SI Visora在线生图', group_id: groupId, ...(options.keyExpiresInDays ? { expires_in_days: options.keyExpiresInDays } : {}) } }),
+    getKey: (token, id, context) => request(`/api/v1/keys/${Number(id)}`, { token, context }),
+    deleteKey: (token, id, context) => request(`/api/v1/keys/${Number(id)}`, { method: 'DELETE', token, context }),
     logout: (refreshToken) => demo ? Promise.resolve() : request('/api/v1/auth/logout', { method: 'POST', body: { refresh_token: refreshToken } }),
     async converse(key, payload, context = {}) {
       if (demo) {

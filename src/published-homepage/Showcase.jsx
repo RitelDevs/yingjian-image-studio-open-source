@@ -66,18 +66,18 @@ export default function Showcase({ children, authenticated, onEnter }) {
   return <div className="showcase" id="explore" ref={root}>
     <a className="skip-link" href="#account-entry">跳到登录入口</a>
     <header className="showcase-header">
-      <a className="showcase-brand" href="#explore" aria-label="映间首页"><Brand /></a>
+      <a className="showcase-brand" href="#explore" aria-label="Ritel.SI Visora首页"><Brand /></a>
       <nav aria-label="展示页导航"><a href="#showcase-works">灵感展厅 <span>01</span></a><a href="#showcase-workflow">创作方式 <span>02</span></a></nav>
       <button className="showcase-enter" onClick={enter}>{authenticated ? '进入工作台' : '登录 / 开始创作'}<ArrowUpRight size={18} /></button>
     </header>
-    <section className="manifesto-stage" ref={stage} aria-label="映间创作空间">
+    <section className="manifesto-stage" ref={stage} aria-label="Ritel.SI Visora创作空间">
       <div className="manifesto-sticky">
-        <div className="manifesto-meta"><span>映间 / 在线图像创作</span><span>IMAGINATION, IN FRAME.</span></div>
+        <div className="manifesto-meta"><span>Ritel.SI Visora / 在线图像创作</span><span>IMAGINATION, IN FRAME.</span></div>
         <div className="manifesto-copy">
           <h1><span>想象，</span><span>即刻<span className="type-highlight">成像</span>。</span></h1>
           <div className="manifesto-action"><p>从一句话开始。<br />把脑海里的画面，带到眼前。</p><button onClick={enter}>开始创作 <ArrowUpRight size={22} /></button></div>
         </div>
-        <figure className="manifesto-art"><div className="spatial-art-bar" aria-hidden="true"><span className="spatial-window-dots"><i /><i /><i /></span><span>映间 · 灵感示例</span><ArrowUpRight size={18} /></div><img src="/editorial/architecture.svg" alt="蓝色天空下的极简几何建筑原创插画" width="1600" height="1100" fetchPriority="high" /><figcaption className="manifesto-art-copy"><span>SPACE & LIGHT</span><strong>让想象<br />有形状。</strong></figcaption><span className="art-edition" aria-hidden="true">01 / SPACE</span></figure>
+        <figure className="manifesto-art"><div className="spatial-art-bar" aria-hidden="true"><span className="spatial-window-dots"><i /><i /><i /></span><span>Ritel.SI Visora · 灵感示例</span><ArrowUpRight size={18} /></div><img src="/editorial/architecture.svg" alt="蓝色天空下的极简几何建筑原创插画" width="1600" height="1100" fetchPriority="high" /><figcaption className="manifesto-art-copy"><span>SPACE & LIGHT</span><strong>让想象<br />有形状。</strong></figcaption><span className="art-edition" aria-hidden="true">01 / SPACE</span></figure>
         <div className="manifesto-bottom"><a href="#showcase-works"><ArrowDown size={16} /> 向下，发现更多</a><span>文字生图 / 参考图修改 / 连续创作</span></div>
       </div>
     </section>
@@ -98,6 +98,6 @@ export default function Showcase({ children, authenticated, onEnter }) {
       ].map(([number, title, description]) => <li key={number} className="scroll-reveal"><span>{number}</span><div><h3>{title}</h3><p>{description}</p></div></li>)}</ol>
     </section>
     <section id="account-entry" className="showcase-account">{authenticated ? <div className="showcase-return"><span className="editorial-label">YOUR NEXT IDEA STARTS HERE</span><h2>轮到你了。</h2><button className="showcase-enter" onClick={onEnter}>回到工作台 <ArrowUpRight size={24} /></button></div> : children}</section>
-    <footer className="showcase-bottom"><a href="#explore" aria-label="回到映间首页"><Brand /></a><span>想象没有边界。画面由你定义。</span><a href="#explore">回到顶部 <ArrowUpRight size={16} /></a></footer>
+    <footer className="showcase-bottom"><a href="#explore" aria-label="回到Ritel.SI Visora首页"><Brand /></a><span>想象没有边界。画面由你定义。</span><a href="#explore">回到顶部 <ArrowUpRight size={16} /></a></footer>
   </div>;
 }

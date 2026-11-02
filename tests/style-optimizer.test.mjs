@@ -63,7 +63,7 @@ async function fixture(t, options = {}) {
   t.after(async () => {
     for (let n = 0; app.queue.active && n < 300; n++) await pause(10);
     assert.equal(app.queue.active, 0);
-    await new Promise(resolve => app.server.close(resolve)); app.close();
+    await new Promise(resolve => app.server.close(resolve)); await app.close();
     const target = resolve(directory); assert.equal(dirname(target), resolve(tmpdir())); assert.ok(basename(target).startsWith('studio-professional-test-'));
     rmSync(target, { recursive: true, force: true });
   });
