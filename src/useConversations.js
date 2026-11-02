@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { draftAspectRatio, resolveImageGeometry } from '../shared/image-geometry.mjs';
+import { draftAspectRatio, draftPixelSize, resolveImageGeometry } from '../shared/image-geometry.mjs';
 import { selectReferenceFiles } from './reference-files.js';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
 
@@ -21,7 +21,7 @@ export function useConversations({ call, userId, defaultGroupId, defaultChatMode
       const saved = JSON.parse(sessionStorage.getItem(`${storageKey}:style:${id || emptyKey}`) || '{}');
       const selected = saved.selectedStyle;
       if (selected && (!STYLE_CATALOG.some(style => style.id === selected.id && style.version === selected.version) || !/^[a-f0-9-]{36}$/i.test(selected.selectionId))) return { selectedStyle: null, styleTouched: true, useContext: false };
-      return { imageModel: imageModels.includes(saved.imageModel) ? saved.imageModel : defaultImageModel, chatModel: chatModels.includes(saved.chatModel) ? saved.chatModel : defaultChatModel, selectedStyle: selected || null, styleTouched: saved.styleTouched === true, styleTitle: typeof saved.styleTitle === 'string' ? saved.styleTitle : '', styleOptimization: saved.styleOptimization === 'template' ? 'template' : 'professional', ...(saved.useContext === false ? { useContext: false } : {}) };
+      return { generationMode: saved.generationMode === 'direct' ? 'direct' : 'chat', size: ['1K','2K','4K','A2','A3','A4','custom'].includes(saved.size) ? saved.size : '2K', pixelWidth: typeof saved.pixelWidth === 'string' ? saved.pixelWidth : '1536', pixelHeight: typeof saved.pixelHeight === 'string' ? saved.pixelHeight : '1024', aspectRatio: typeof saved.aspectRatio === 'string' ? saved.aspectRatio : 'auto', ratioWidth: typeof saved.ratioWidth === 'string' ? saved.ratioWidth : '16', ratioHeight: typeof saved.ratioHeight === 'string' ? saved.ratioHeight : '9', imageModel: imageModels.includes(saved.imageModel) ? saved.imageModel : defaultImageModel, chatModel: chatModels.includes(saved.chatModel) ? saved.chatModel : defaultChatModel, selectedStyle: selected || null, styleTouched: saved.styleTouched === true, styleTitle: typeof saved.styleTitle === 'string' ? saved.styleTitle : '', styleOptimization: saved.styleOptimization === 'template' ? 'template' : 'professional', ...(saved.useContext === false ? { useContext: false } : {}) };
     } catch { return {}; }
   }
   const [activeId, setActiveId] = useState(() => {
@@ -46,7 +46,7 @@ export function useConversations({ call, userId, defaultGroupId, defaultChatMode
     const key = id || emptyKey;
     if (!cache.current[key]) cache.current[key] = {
       messages: null, loading: false, error: '', notice: '', sending: false,
-      draft: { prompt: '', refs: [], chatModel: defaultChatModel, imageModel: defaultImageModel, size: '2K', aspectRatio: 'auto', ratioWidth: '16', ratioHeight: '9', count: 1, groupId: defaultGroupId, useContext: true, contextParentId: undefined, requestId: crypto.randomUUID(), selectedStyle: null, styleTouched: false, styleTitle: '', styleOptimization: 'professional', ...restoreStyleDraft(id) }
+      draft: { prompt: '', refs: [], generationMode: 'chat', pixelWidth: '1536', pixelHeight: '1024', chatModel: defaultChatModel, imageModel: defaultImageModel, size: '2K', aspectRatio: 'auto', ratioWidth: '16', ratioHeight: '9', count: 1, groupId: defaultGroupId, useContext: true, contextParentId: undefined, requestId: crypto.randomUUID(), selectedStyle: null, styleTouched: false, styleTitle: '', styleOptimization: 'professional', ...restoreStyleDraft(id) }
     };
     return cache.current[key];
   }, [defaultGroupId, defaultChatModel, chatModels, defaultImageModel, imageModels, storageKey]);
@@ -54,8 +54,8 @@ export function useConversations({ call, userId, defaultGroupId, defaultChatMode
     const key = id || emptyKey;
     cache.current = { ...cache.current, [key]: { ...get(id), ...values } };
     if (values.draft) {
-      const { selectedStyle, styleTouched, styleTitle, styleOptimization, useContext, chatModel, imageModel } = values.draft;
-      try { sessionStorage.setItem(`${storageKey}:style:${key}`, JSON.stringify({ selectedStyle, styleTouched, styleTitle, styleOptimization, useContext, chatModel, imageModel })); } catch {}
+      const { selectedStyle, styleTouched, styleTitle, styleOptimization, useContext, chatModel, imageModel, generationMode, size, aspectRatio, pixelWidth, pixelHeight, ratioWidth, ratioHeight } = values.draft;
+      try { sessionStorage.setItem(`${storageKey}:style:${key}`, JSON.stringify({ selectedStyle, styleTouched, styleTitle, styleOptimization, useContext, chatModel, imageModel, generationMode, size, aspectRatio, pixelWidth, pixelHeight, ratioWidth, ratioHeight })); } catch {}
     }
     if (live.current) setEntries(cache.current);
   }, [get, storageKey]);
@@ -242,9 +242,9 @@ export function useConversations({ call, userId, defaultGroupId, defaultChatMode
   const submit = useCallback(async () => {
     const source = active.current;
     const entry = get(source), snapshot = entry.draft;
-    if (entry.sending || !snapshot.prompt.trim() || !snapshot.groupId) return;
+    if (entry.sending || (!snapshot.prompt.trim() && !snapshot.selectedStyle) || !snapshot.groupId) return;
     let geometry;
-    try { geometry = resolveImageGeometry(snapshot.size, draftAspectRatio(snapshot)); }
+    try { geometry = resolveImageGeometry(snapshot.size, draftAspectRatio(snapshot), draftPixelSize(snapshot)); }
     catch (error) { patch(source, { notice: error.message }); return; }
     patch(source, { sending: true, notice: '' });
     let threadId = source;
@@ -253,10 +253,12 @@ export function useConversations({ call, userId, defaultGroupId, defaultChatMode
       threadId = source || await create();
       if (!threadId) return;
       const references = await Promise.all(snapshot.refs.map(async item => item.mediaId ? { mediaId: item.mediaId } : { dataUrl: await fileToDataUrl(item.file) }));
-      const { job } = await call('/api/chat', { method: 'POST', body: JSON.stringify({
-        clientRequestId: snapshot.requestId, threadId, prompt: snapshot.prompt.trim(), chatModel: snapshot.chatModel, imageModel: snapshot.imageModel,
+      const direct = snapshot.generationMode === 'direct';
+      const style = direct && snapshot.selectedStyle && STYLE_CATALOG.find(item => item.id === snapshot.selectedStyle.id);
+      const { job } = await call(direct ? '/api/jobs' : '/api/chat', { method: 'POST', body: JSON.stringify({
+        clientRequestId: snapshot.requestId, threadId, prompt: snapshot.prompt.trim() || (style ? `参考图套用：${style.name}` : ''), ...(style ? { styleId: style.id, styleVersion: style.version, styleSubject: snapshot.prompt.trim(), title: snapshot.styleTitle || '', styleSelectionId: snapshot.selectedStyle.selectionId } : {}), pixelSize: geometry.pixelSize, chatModel: snapshot.chatModel, imageModel: snapshot.imageModel,
         count: snapshot.count, size: snapshot.size, aspectRatio: geometry.aspectRatio, groupId: snapshot.groupId, references,
-        useContext: snapshot.useContext !== false, ...(snapshot.contextParentId !== undefined ? { contextParentId: snapshot.contextParentId } : {})
+        useContext: direct ? false : snapshot.useContext !== false, ...(snapshot.contextParentId !== undefined ? { contextParentId: snapshot.contextParentId } : {})
       }) });
       invalidate(threadId);
       const current = get(threadId);
@@ -285,10 +287,10 @@ export function useConversations({ call, userId, defaultGroupId, defaultChatMode
     const entry = get(source), snapshot = entry.draft;
     if (entry.sending) return { ok: false, error: '这段创作正在提交，请稍候。' };
     let geometry;
-    try { geometry = resolveImageGeometry(input.size, input.aspectRatio); }
+    try { geometry = resolveImageGeometry(input.size, input.aspectRatio, input.pixelSize); }
     catch (error) { return { ok: false, error: error.message }; }
     if (!input.groupId) return { ok: false, error: '请选择可用的生图分组。' };
-    const payload = { chatModel: snapshot.chatModel, imageModel: snapshot.imageModel, styleId: input.styleId, styleVersion: input.styleVersion, subject: input.subject,
+    const payload = { pixelSize: geometry.pixelSize, chatModel: snapshot.chatModel, imageModel: snapshot.imageModel, styleId: input.styleId, styleVersion: input.styleVersion, subject: input.subject,
       title: input.title ?? '', styleOptimization: input.styleOptimization ?? 'professional', size: input.size, aspectRatio: geometry.aspectRatio, count: input.count, groupId: input.groupId, ...(input.styleSelectionId ? { styleSelectionId: input.styleSelectionId } : {}) };
     const signature = JSON.stringify([payload, snapshot.requestId, snapshot.refs.map(item => item.mediaId || item.objectUrl)]);
     // Keep the request id through network failures so retrying cannot create another plan.

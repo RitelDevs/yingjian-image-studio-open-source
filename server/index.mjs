@@ -267,9 +267,9 @@ function buildApplication(options, sub2apiAccount) {
       const thread = store.thread(input.threadId, session.user_id);
       if (!thread) throw new GatewayError('请选择自己的创作记录。', 404);
       const count = Number(input.count ?? 1), groupId = Number(input.groupId), size = input.size ?? '2K';
-      if (!Number.isInteger(count) || count < 1 || count > 4 || !['1K', '2K', '4K'].includes(size)) throw new GatewayError('图片数量或尺寸无效。', 400);
+      if (!Number.isInteger(count) || count < 1 || count > 4) throw new GatewayError('图片数量或尺寸无效。', 400);
       let geometry;
-      try { geometry = resolveImageGeometry(size, input.aspectRatio ?? 'auto'); }
+      try { geometry = resolveImageGeometry(size, input.aspectRatio ?? 'auto', input.pixelSize); }
       catch (error) { throw new GatewayError(error.message, 400); }
       if (input.references != null && !Array.isArray(input.references)) throw new GatewayError('参考图列表无效。', 400);
       const refs = input.references ?? [];
@@ -304,8 +304,8 @@ function buildApplication(options, sub2apiAccount) {
       const optimizationSnapshot = optimizationMode === 'professional' ? createStyleOptimizationSnapshot({
         compiled, subject: (input.subject ?? '').trim(), title: (input.title ?? '').trim(), model: selectedChatModel, demo, styleSelectionId
       }) : null;
-      const context = { enabled: false, imageModel: selectedImageModel, ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
-      const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId, imageModel: selectedImageModel };
+      const context = { enabled: false, imageModel: selectedImageModel, ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}), ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
+      const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId, imageModel: selectedImageModel, ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}) };
       const subject = (input.subject ?? '').trim() || `参考图套用：${compiled.style.name}`, title = (input.title ?? '').trim();
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, thread.id, {
@@ -346,8 +346,9 @@ function buildApplication(options, sub2apiAccount) {
       if (plan.proposal.jobId) return send(res, 200, { job: store.getMessage(plan.proposal.jobId, session.user_id), plan: store.getMessage(id, session.user_id), duplicate: true });
       if (plan.proposal.style && store.isStyleRevoked(session.user_id, plan.proposal.styleSelectionId || id)) throw new GatewayError('该风格已取消，请重新整理生成方案。', 409, false, 'style_revoked');
       if (plan.proposal.state !== 'ready') throw new GatewayError('这份方案已被后续对话更新，请确认最新方案。', 409);
-      const { size, count, aspectRatio, groupId } = plan.proposal.settings;
+      const { size, count, aspectRatio, groupId, pixelSize } = plan.proposal.settings;
       const selectedImageModel = imageSelection.stored(plan.proposal.settings.imageModel);
+      try { resolveImageGeometry(size, aspectRatio, pixelSize); } catch(error) { throw new GatewayError(error.message,400); }
       if (Object.hasOwn(input, 'imageModel') && input.imageModel !== selectedImageModel) throw new GatewayError('方案的生图模型已锁定，请重新整理方案后再切换。', 409, false, 'image_model_locked');
       if (!groups.some(item => item.id === groupId)) throw new GatewayError('当前账号不能使用该方案的生图分组，请重新选择分组并整理方案。', 403);
       const images = plan.proposal.referenceIds.map(mediaId => store.media(mediaId, session.user_id));
@@ -356,7 +357,7 @@ function buildApplication(options, sub2apiAccount) {
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, plan.threadId, {
           clientRequestId: `confirmed-plan:${id}`, prompt, model: selectedImageModel, size, count, aspectRatio, groupId,
-          context: { ...plan.proposal.context, planId: id, ...(plan.proposal.style ? { style: plan.proposal.style } : {}), ...(plan.proposal.optimization ? { optimization: plan.proposal.optimization } : {}) }
+          context: { ...plan.proposal.context, ...(pixelSize ? { pixelSize } : {}), planId: id, ...(plan.proposal.style ? { style: plan.proposal.style } : {}), ...(plan.proposal.optimization ? { optimization: plan.proposal.optimization } : {}) }
         });
         const references = images.map(item => store.addMedia(session.user_id, record.id, 'input', item.mime, item.bytes));
         store.setReferences(record.id, references); store.markConfirmed(id, record.id, prompt);
@@ -389,12 +390,12 @@ function buildApplication(options, sub2apiAccount) {
         }
         context.parentId = input.contextParentId;
       }
-      const prompt = String(input.prompt || '').trim();
+      let prompt = String(input.prompt || '').trim();
       const count = Number(input.count || 1), groupId = Number(input.groupId), size = String(input.size || '2K');
       if (!prompt || prompt.length > 4000) throw new GatewayError('提示词长度应在 1 到 4000 字之间。', 400);
-      if (!Number.isInteger(count) || count < 1 || count > 4 || !['1K', '2K', '4K'].includes(size)) throw new GatewayError('图片数量或尺寸无效。', 400);
+      if (!Number.isInteger(count) || count < 1 || count > 4) throw new GatewayError('图片数量或尺寸无效。', 400);
       let geometry;
-      try { geometry = resolveImageGeometry(size, input.aspectRatio ?? 'auto'); }
+      try { geometry = resolveImageGeometry(size, input.aspectRatio ?? 'auto', input.pixelSize); }
       catch (error) { throw new GatewayError(error.message, 400); }
       if (integration && count !== 1) throw new GatewayError('本轮联调每次只生成 1 张图片。', 400);
       const groups = groupList(await gateway.groups(session.accessToken, session.context));
@@ -415,6 +416,18 @@ function buildApplication(options, sub2apiAccount) {
         return image;
       });
       if (totalSize > 24 * 1024 * 1024) throw new GatewayError('参考图总量超过 24 MB。', 413);
+      if (geometry.pixelSize) context.pixelSize = geometry.pixelSize;
+      if (!chat) {
+        context.generationMode = 'direct'; context.userPrompt = prompt;
+        if (input.styleId !== undefined) {
+          if (input.styleSelectionId !== undefined && (typeof input.styleSelectionId !== 'string' || !/^[a-f0-9-]{36}$/i.test(input.styleSelectionId))) throw new GatewayError('风格选择编号无效。',400);
+          if (store.isStyleRevoked(session.user_id,input.styleSelectionId)) throw new GatewayError('风格已取消，请重新选择。',409);
+          try {
+            const compiled = compileStyleRecipe({styleId:input.styleId,styleVersion:input.styleVersion,subject:Object.hasOwn(input,'styleSubject')?input.styleSubject:prompt,title:input.title ?? '',hasReferences:parsed.length>0});
+            prompt=compiled.prompt;context.style=compiled.style;context.styleSubject=Object.hasOwn(input,'styleSubject')?input.styleSubject:context.userPrompt;context.styleTitle=input.title ?? '';
+          } catch(error) { if (error instanceof StyleRecipeError) throw new GatewayError(error.message,error.status,false,error.reason); throw error; }
+        }
+      }
       const existing = store.findRequest(session.user_id, clientRequestId);
       if (existing) return send(res, 200, { job: existing, duplicate: true });
       if (integration && store.db.prepare('SELECT count(*) AS n FROM messages').get().n >= integration.maxJobs) {

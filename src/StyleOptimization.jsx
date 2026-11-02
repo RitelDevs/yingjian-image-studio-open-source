@@ -20,6 +20,6 @@ export function StyleOptimizationSummary({ optimization }) {
   return <section className="style-optimization-summary" aria-label="专业优化说明">
     <div><strong>{optimization.simulated ? '专业优化 · 本地模拟' : '专业优化'} · {optimization.profileName}</strong></div>
     <ul>{optimization.decisions.map((item, index) => <li key={`${item.aspect}-${index}`}><strong>{item.label}</strong><span>{item.detail}</span></li>)}</ul>
-    <p>参考规则：{[...new Set((optimization.sources || []).map(source => source.skill))].join('、') || '当前风格规则'}。请核对下方完整提示词后再确认。</p>
+    <p>参考规则：{[...new Set((optimization.sources || []).map(source => source.skill))].join('、') || '当前风格规则'}。请核对完整提示词后再确认。</p>
   </section>;
 }

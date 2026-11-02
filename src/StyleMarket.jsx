@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowRight, ArrowUpRight, ImagePlus, Layers3, LoaderCircle, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
 import { getStyleExample } from '../shared/style-examples.mjs';
-import { draftAspectRatio, resolveImageGeometry } from '../shared/image-geometry.mjs';
+import { SIZE_OPTIONS, draftPixelSize, draftAspectRatio, resolveImageGeometry } from '../shared/image-geometry.mjs';
 import ImageGeometry from './ImageGeometry.jsx';
 import OptionPicker from './OptionPicker.jsx';
 import StyleOptimization from './StyleOptimization.jsx';
@@ -179,9 +179,9 @@ export default function StyleMarket({ demo = false, optimizationAvailable = fals
   const search = query.trim().toLocaleLowerCase();
   const visible = STYLE_CATALOG.filter(style => (packageMode === 'all' || style.inputMode === packageMode) && (category === '全部' || style.category === category)
     && `${style.name} ${style.category} ${style.description} ${style.tags.join(' ')}`.toLocaleLowerCase().includes(search));
-  const settings = selected ? settingsByStyle[selected.id] || { ...selected.defaultSettings, ratioWidth: '16', ratioHeight: '9', groupId: draft.groupId, styleOptimization: 'professional' } : null;
+  const settings = selected ? settingsByStyle[selected.id] || { ...selected.defaultSettings, ratioWidth: '16', ratioHeight: '9', pixelWidth:'1536', pixelHeight:'1024', groupId: draft.groupId, styleOptimization: 'professional' } : null;
   let geometry, geometryError = '';
-  if (settings) { try { geometry = resolveImageGeometry(settings.size, draftAspectRatio(settings)); } catch (issue) { geometryError = issue.message; } }
+  if (settings) { try { geometry = resolveImageGeometry(settings.size, draftAspectRatio(settings), draftPixelSize(settings)); } catch (issue) { geometryError = issue.message; } }
   const hasGroup = settings && groups.some(group => String(group.id) === String(settings.groupId));
   const invalidLength = (!referenceOnly && subject.trim().length > 1200) || (selected?.supportsTitle && title.length > 80);
 
@@ -205,7 +205,7 @@ export default function StyleMarket({ demo = false, optimizationAvailable = fals
     submitLock.current = true; setBusy(true); setError(''); onClearNotice();
     try {
       const result = await prepareStylePlan({ styleId: selected.id, styleVersion: selected.version, subject: referenceOnly ? '' : subject.trim(),
-        title: selected.supportsTitle ? title.trim() : '', styleOptimization: optimizationAvailable ? settings.styleOptimization || 'professional' : 'template', size: settings.size, aspectRatio: geometry.aspectRatio, count: settings.count, groupId: settings.groupId });
+        title: selected.supportsTitle ? title.trim() : '', styleOptimization: optimizationAvailable ? settings.styleOptimization || 'professional' : 'template', size: settings.size, aspectRatio: geometry.aspectRatio, pixelSize: geometry.pixelSize, count: settings.count, groupId: settings.groupId });
       if (!live.current) return;
       if (!result?.ok) { setError(result?.error || '方案暂未创建成功，请重试。'); return; }
       setSelectedId(null);
@@ -253,7 +253,7 @@ export default function StyleMarket({ demo = false, optimizationAvailable = fals
               {notice && notice !== error && <div className="style-inline-notice" role="status">{notice}<button type="button" className="icon-button" aria-label="关闭上传提示" onClick={onClearNotice}><X size={15} /></button></div>}
             </div>
             {optimizationAvailable && <StyleOptimization style={selected} value={settings.styleOptimization || 'professional'} onChange={styleOptimization => changeSettings({ styleOptimization })} disabled={busy} demo={demo} />}
-            <div className="style-settings"><div className="style-field-heading"><span>生成设置</span><span className="style-recommended">推荐 {selected.defaultSettings.aspectRatio}</span></div><div className="style-settings-row"><OptionPicker label="尺寸" value={settings.size} options={['1K', '2K', '4K'].map(value => ({ value, label: value }))} onChange={size => changeSettings({ size })} /><div className="style-count"><span>张数</span><button type="button" aria-label="减少风格生图张数" disabled={settings.count <= 1} onClick={() => changeSettings({ count: settings.count - 1 })}>−</button><strong>{settings.count}</strong><button type="button" aria-label="增加风格生图张数" disabled={settings.count >= 4} onClick={() => changeSettings({ count: settings.count + 1 })}>+</button></div><OptionPicker label="计费分组" value={settings.groupId} options={groups.map(group => ({ value: group.id, label: group.name }))} onChange={groupId => changeSettings({ groupId })} /></div><ImageGeometry draft={settings} onChange={changeSettings} /></div>
+            <div className="style-settings"><div className="style-field-heading"><span>生成设置</span><span className="style-recommended">推荐 {selected.defaultSettings.aspectRatio}</span></div><div className="style-settings-row"><OptionPicker label="尺寸" value={settings.size} options={SIZE_OPTIONS} onChange={size => changeSettings({ size, aspectRatio:'auto' })} /><div className="style-count"><span>张数</span><button type="button" aria-label="减少风格生图张数" disabled={settings.count <= 1} onClick={() => changeSettings({ count: settings.count - 1 })}>−</button><strong>{settings.count}</strong><button type="button" aria-label="增加风格生图张数" disabled={settings.count >= 4} onClick={() => changeSettings({ count: settings.count + 1 })}>+</button></div><OptionPicker label="计费分组" value={settings.groupId} options={groups.map(group => ({ value: group.id, label: group.name }))} onChange={groupId => changeSettings({ groupId })} /></div><ImageGeometry draft={settings} onChange={changeSettings} /></div>
           </fieldset>
           <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
         </div>

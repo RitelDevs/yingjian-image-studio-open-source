@@ -298,3 +298,40 @@ test('gateway sends selected aliases in image JSON and multipart and never falls
   fail=true;await assert.rejects(gateway.generate('fixture-only-key',{model:'gpt-image-2.5-flare',prompt:'轮椅',size:'2K',count:1,references:[]}));assert.equal(requests.length,5);
  }finally{await new Promise(r=>upstream.close(r));}
 });
+
+
+test('direct mode bypasses chat, compiles optional style locally and pins custom dimensions with references',async()=>{
+ const site=await fixture();
+ try{
+  const cookie=await site.login(),thread=await site.thread(cookie),style=STYLE_CATALOG.find(item=>item.inputMode!=='reference');
+  const body={clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'轮椅直出',groupId:2,size:'custom',pixelSize:{width:1000,height:1500},imageModel:'gpt-image-2.5-sunburst',references:[{dataUrl:'data:image/png;base64,'+png}],useContext:false,styleId:style.id,styleVersion:style.version};
+  const results=await Promise.all([site.request('/api/jobs',{cookie,body}),site.request('/api/jobs',{cookie,body})]);assert.ok(results.every(r=>[200,202].includes(r.status)));assert.equal(results[0].data.job.id,results[1].data.job.id);
+  const job=await site.wait(results[0].data.job.id,cookie);assert.equal(job.status,'done');assert.equal(job.kind,'image');assert.equal(job.context.generationMode,'direct');assert.equal(job.context.userPrompt,'轮椅直出');assert.deepEqual(job.context.pixelSize,{width:1008,height:1504});assert.equal(job.context.style.id,style.id);assert.equal(site.calls.chats.length,0);assert.equal(site.calls.images.length,1);
+  const sent=site.calls.images[0].payload;assert.equal(sent.model,'gpt-image-2.5-sunburst');assert.deepEqual(sent.pixelSize,{width:1008,height:1504});assert.equal(sent.references.length,1);assert.match(sent.prompt,/轮椅直出/);assert.match(sent.prompt,/风格规则/);
+ }finally{await site.stop();}
+});
+
+test('custom and paper dimensions remain locked through conversation and both style confirmation paths',async()=>{
+ const site=await fixture({converse:p=>p.messages[0].content.includes('专业方案助理')?JSON.stringify({ready:true,decisions:[{aspect:'composition',detail:'完整展示主体，保留自然比例。'},{aspect:'preservation',detail:'保持轮椅结构，不虚构部件。'}]}):answer()});
+ try{
+  const cookie=await site.login(),thread=await site.thread(cookie);
+  const ordinary=await site.chat(cookie,thread,{size:'custom',pixelSize:{width:1000,height:1500}});assert.deepEqual(ordinary.proposal.settings.pixelSize,{width:1008,height:1504});const confirmed=await site.confirm(cookie,ordinary.id,{pixelSize:{width:2048,height:2048},size:'4K'});assert.equal((await site.wait(confirmed.data.job.id,cookie)).size,'custom');assert.deepEqual(site.calls.images.at(-1).payload.pixelSize,{width:1008,height:1504});
+  const style=STYLE_CATALOG.find(item=>item.inputMode!=='reference');
+  for(const mode of ['template','professional'])for(const dims of [{size:'A3',aspectRatio:'landscape'},{size:'custom',pixelSize:{width:1536,height:2048}}]){
+   const prepared=await site.request('/api/style-plans',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,styleId:style.id,styleVersion:style.version,subject:'轮椅',groupId:2,count:1,styleOptimization:mode,...dims}});assert.ok([201,202].includes(prepared.status));const plan=await site.wait(prepared.data.job.id,cookie);assert.equal(plan.status,'done');assert.equal(plan.proposal.settings.size,dims.size);const image=await site.confirm(cookie,plan.id);assert.equal((await site.wait(image.data.job.id,cookie)).status,'done');const sent=site.calls.images.at(-1).payload;assert.equal(sent.size,dims.size);if(dims.pixelSize)assert.deepEqual(sent.pixelSize,dims.pixelSize);else assert.equal(sent.aspectRatio,'31:22');
+  }
+ }finally{await site.stop();}
+});
+
+test('invalid custom dimensions and revoked direct styles fail without a paid dispatch',async()=>{
+ const site=await fixture();
+ try{
+  const cookie=await site.login(),thread=await site.thread(cookie),style=STYLE_CATALOG.find(item=>item.inputMode!=='reference');
+  for(const pixelSize of [undefined,{width:1,height:1},{width:9999,height:1000},{width:4096,height:512}]){
+   assert.equal((await site.submit(cookie,thread,{size:'custom',pixelSize})).status,400);
+   assert.equal((await site.request('/api/jobs',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'轮椅',groupId:2,size:'custom',pixelSize}})).status,400);
+  }
+  const styleSelectionId=crypto.randomUUID();await site.request('/api/style-selections/'+styleSelectionId+'/revoke',{cookie,body:{}});
+  const denied=await site.request('/api/jobs',{cookie,body:{clientRequestId:crypto.randomUUID(),threadId:thread,prompt:'轮椅',groupId:2,styleId:style.id,styleVersion:style.version,styleSelectionId}});assert.equal(denied.status,409);assert.equal(site.calls.images.length,0);assert.equal(site.calls.chats.length,0);
+ }finally{await site.stop();}
+});

@@ -254,8 +254,8 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       // Tools are never passed to the model or executed by this application.
       return typeof answer?.content === 'string' ? answer.content : '';
     },
-    async generate(key, { prompt, size, count, references, aspectRatio = 'auto', model: requestModel = model }) {
-      const { requestSize } = resolveImageGeometry(size, aspectRatio);
+    async generate(key, { prompt, size, count, references, aspectRatio = 'auto', model: requestModel = model, pixelSize }) {
+      const { requestSize } = resolveImageGeometry(size, aspectRatio, pixelSize);
       if (demo) {
         const fs = await import('node:fs/promises');
         const { join } = await import('node:path');

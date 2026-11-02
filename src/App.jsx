@@ -1,3 +1,4 @@
+import PromptDisclosure from './PromptDisclosure.jsx';
 import { DEFAULT_IMAGE_MODEL, imageModelLabel } from '../shared/image-models.mjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -22,7 +23,7 @@ import StyleMarket from './StyleMarket.jsx';
 import StyleOptimization from './StyleOptimization.jsx';
 import ImageViewer from './ImageViewer.jsx';
 import TurnstileVerification from './TurnstileVerification.jsx';
-import { imageSettingsForRetry, draftAspectRatio } from '../shared/image-geometry.mjs';
+import { SIZE_OPTIONS, imageSettingsForRetry, draftPixelSize, draftAspectRatio, resolveImageGeometry } from '../shared/image-geometry.mjs';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
 import { getStyleExample } from '../shared/style-examples.mjs';
 import ImageEditor from './editor-ui/ImageEditor.jsx';
@@ -31,7 +32,6 @@ import { installStudioSessionReactivation } from './session-reactivation.mjs';
 
 const CONTACT = 'panrui12';
 const REGISTER_URL = 'https://api-us.ritelt.com/register?aff=885EB5776PEU';
-const SIZE_OPTIONS = ['1K', '2K', '4K'];
 const statusText = {
   queued: '排队中', running: '生成中', done: '已完成', partial: '部分完成',
   unknown: '待核对', failed: '未完成'
@@ -208,7 +208,7 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
   const pending = item.status === 'queued' || item.status === 'running';
   return <article className="conversation-turn">
     <div className="turn-meta"><div className="turn-avatar">你</div><strong>你</strong><time>{new Date(item.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time></div>
-    <div className="prompt-text">{item.prompt}</div>
+    <div className="prompt-text">{item.context?.userPrompt || item.prompt}</div>
     {chat && (item.proposal?.style || item.context?.styleOptimization?.style) && <div className="turn-style-settings"><Layers3 size={12} /><span>{(item.proposal?.style || item.context.styleOptimization.style).name}</span><span>·</span><span>{item.proposal?.optimization?.mode === 'professional' || item.context?.styleOptimization ? '专业优化' : '直接套用'}</span></div>}
     {item.context?.turnIds?.length > 0 && <div className="turn-settings">已参考前 {item.context.turnIds.length} 轮要求{item.context.imageId ? '及上一轮图片' : ''}</div>}
     {item.aspectRatio && item.aspectRatio !== 'auto' && <div className="turn-settings">{item.size} · {item.aspectRatio}</div>}
@@ -216,7 +216,7 @@ function Message({ item, onEditImage, onUseImage, onRetry, onCopy, onOpenImage, 
     <div className="response-block">
       <div className="response-heading"><span className="result-symbol"><Sparkles size={17} /></span><strong>Ritel.SI Visora</strong><span className={`status status-${item.status}`}>{pending && <LoaderCircle className="spin" size={13} />}{chat && item.recovery === 'style_template' ? '方案未整理成功' : chat ? ({ queued: '等待回复', running: '正在思考', done: '已回复', unknown: '回复待核对', failed: '回复失败' }[item.status] || item.status) : statusText[item.status] || item.status}</span></div>
       {pending && <div className="progress-line"><span />{chat ? (item.status === 'queued' ? '正在等待前一轮完成…' : item.context?.styleOptimization ? '正在按专业规则推敲构图、光影与表现方式…' : '正在理解需求、整理回复…') : item.status === 'queued' ? '正在排队，空出位置后会自动开始，无需重复提交。' : '正在生成图片'}</div>}
-      {chat && item.assistantText && <p className="assistant-reply">{item.assistantText}</p>}
+      {chat && item.assistantText && <PromptDisclosure key={item.assistantText} text={item.assistantText} label="回复" />}
       {chat && item.proposal && <ProposalCard item={item} groupName={groupName} confirming={confirming} blocked={blocked} onConfirm={onConfirm} />}
       {item.images?.length > 0 && <div className={`image-grid ${item.images.length === 1 ? 'single-image' : ''}`}>{item.images.map((image, index) => <div className="image-item" key={image.id}>
         <button className="image-open" onClick={() => onOpenImage({ ...image, threadId: item.threadId, name: `生成作品-${index + 1}` })} title="查看大图" aria-label={`查看生成结果 ${index + 1}`}><img src={image.url} alt={`生成结果 ${index + 1}`} loading="lazy" /></button>
@@ -243,9 +243,11 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   const { threads, activeId, messages, draft, sending, creating, notice, loading, loadError,
     choose, create, remove, rename, attachEditorReference, submit, prepareStylePlan, selectStyle, retryStyleCancellation, styleCancellationPending, confirmPlan, confirming, editDraft, setNotice, addFiles, removeRef, replaceRefs, reloadThread } = conversations;
   const { prompt, refs, size, count, groupId } = draft;
+  const direct = draft.generationMode === 'direct';
   const chosenStyle = STYLE_CATALOG.find(style => style.id === draft.selectedStyle?.id && style.version === draft.selectedStyle?.version);
   const chosenExample = chosenStyle && getStyleExample(chosenStyle);
-  const canSubmit = Boolean(groupId && !sending && !styleCancellationPending && (chosenStyle?.inputMode === 'reference' ? refs.length : prompt.trim()) && (!chosenStyle || prompt.trim().length <= 1200));
+  let geometryValid = true; try { resolveImageGeometry(size, draftAspectRatio(draft), draftPixelSize(draft)); } catch { geometryValid = false; }
+  const canSubmit = Boolean(geometryValid && groupId && !sending && !styleCancellationPending && (chosenStyle?.inputMode === 'reference' ? refs.length : prompt.trim()) && (!chosenStyle || prompt.trim().length <= 1200));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [detailImage, setDetailImage] = useState(null);
   const [editorOpen, setEditorOpen] = useState(location.hash === '#editor');
@@ -345,13 +347,13 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     requestAnimationFrame(() => textInput.current?.focus({ preventScroll: true }));
   }
   async function submitComposer() {
-    if (!chosenStyle) return submit();
+    if (!chosenStyle || direct) return submit();
     if (chosenStyle.inputMode === 'reference' && !refs.length) { setNotice('这个风格需要参考图，请先上传图片。'); return; }
     if (prompt.trim().length > 1200) { setNotice('使用风格时描述最多 1200 字，请缩短内容或移除风格标签。'); return; }
     const visit = marketSession.current, source = activeThread.current;
     const result = await prepareStylePlan({ styleId: chosenStyle.id, styleVersion: chosenStyle.version,
       styleSelectionId: draft.selectedStyle.selectionId, styleOptimization: initial.features?.styleOptimization ? draft.styleOptimization || 'professional' : 'template', subject: prompt.trim(), title: chosenStyle.supportsTitle ? draft.styleTitle || '' : '',
-      size, aspectRatio: draftAspectRatio(draft), count, groupId });
+      size, aspectRatio: draftAspectRatio(draft), pixelSize: draftPixelSize(draft), count, groupId });
     if (result?.ok && visit === marketSession.current && (activeThread.current === source || activeThread.current === result.threadId)) {
       pendingStyleFocus.current = result.planId;
       requestAnimationFrame(() => {
@@ -392,8 +394,10 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     textInput.current?.focus();
   }
   function retry(item) {
-    replaceRefs(item.referenceIds.map((id) => ({ mediaId: id, objectUrl: `/api/media/${id}`, name: '参考图' })), item.prompt);
-    editDraft({ ...imageSettingsForRetry(item), ...(imageModels.includes(item.model) ? { imageModel: item.model } : {}), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
+    const wasDirect = item.context?.generationMode === 'direct';
+    if (wasDirect) selectStyle(STYLE_CATALOG.find(style => style.id === item.context?.style?.id && style.version === item.context.style.version) || null);
+    replaceRefs(item.referenceIds.map((id) => ({ mediaId: id, objectUrl: `/api/media/${id}`, name: '参考图' })), wasDirect ? (item.context.styleSubject ?? item.context.userPrompt ?? item.prompt) : item.prompt);
+    editDraft({ ...imageSettingsForRetry(item), ...(wasDirect ? { generationMode:'direct', styleTitle: item.context.styleTitle || '' } : {}), ...(imageModels.includes(item.model) ? { imageModel: item.model } : {}), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
     textInput.current?.focus();
   }
   async function logout() {
@@ -430,6 +434,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
           <div className="composer-drop-overlay" aria-hidden="true"><div className="composer-drop-feedback"><span className="composer-drop-icon"><ImageUp size={24} strokeWidth={1.7} /></span><strong>{dropTitle}</strong><span>{dropHint}</span></div></div>
           <span className="sr-only" role="status" aria-live="polite">{drop.state === 'idle' ? drop.announcement : `${dropTitle}，${dropHint}`}</span>
           {refs.length > 0 && <div className="composer-refs">{refs.map((item, index) => <div className={`composer-ref${item.dropped ? ' is-dropped' : ''}`} key={item.objectUrl || item.mediaId} style={item.dropped ? { transitionDelay: `${item.dropIndex * 40}ms` } : undefined}><img src={item.objectUrl} alt={item.name} /><button title="移除参考图" aria-label="移除参考图" onClick={() => removeRef(index)}><X size={13} /></button></div>)}<span className="ref-label">参考图 {refs.length}/4</span></div>}
+          <div className="composer-mode"><div className="composer-mode-switch" role="group" aria-label="创作模式"><button type="button" aria-pressed={!direct} onClick={() => editDraft({generationMode:'chat'})}>会话模式</button><button type="button" aria-pressed={direct} onClick={() => editDraft({generationMode:'direct'})}>直出模式</button></div><span className="composer-mode-hint">{direct ? '跳过对话，点击生成后按中转计费；风格使用固定规则。' : '先聊需求，确认后才生图。'}</span></div>
           <div className={`composer-text-row${chosenStyle ? ' has-style' : ''}`}>
           {chosenStyle && <span className="composer-style-chip" role="group" aria-label="当前风格">
             <button type="button" className="composer-style-name" aria-label={`更换风格：${chosenStyle.name}`} title={`当前风格：${chosenStyle.name}；点击更换`} onClick={openMarket}>
@@ -442,10 +447,10 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
           </div>
           {chosenStyle && <p className="composer-style-hint">{chosenStyle.inputMode === 'reference' ? '上传参考图，发送后查看方案；点 × 取消风格。' : '只写想画的内容即可；点 × 取消内置风格。'}</p>}
           {chosenStyle && prompt.trim().length > 1200 && <p className="composer-style-error" role="status">已有文字已保留。使用风格时最多 1200 字，可缩短内容或移除标签。</p>}
-          <ImageGeometry draft={draft} onChange={editDraft}><OptionPicker label="生图模型" className="image-model-select" value={draft.imageModel} options={imageOptions.map(item => ({ value: item.id, label: item.label }))} onChange={imageModel => editDraft({ imageModel })} /><OptionPicker label="对话模型" className="chat-model-select" value={draft.chatModel} options={chatModels.map(model => ({ value: model, label: model }))} onChange={chatModel => editDraft({ chatModel })} />{chosenStyle && initial.features?.styleOptimization && <StyleOptimization compact style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}</ImageGeometry>
-          <div className="composer-toolbar"><div className="composer-options"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { addFiles(event.target.files || []); event.target.value = ''; }} /><button className="tool-button" onClick={() => fileInput.current?.click()} title="添加参考图片，也可将图片拖入输入框" aria-label="添加参考图片" disabled={refs.length >= 4}><Paperclip size={18} /></button><span className="toolbar-divider" /><OptionPicker label="尺寸" className="size-select" value={size} options={SIZE_OPTIONS.map(item => ({ value: item, label: item }))} onChange={size => editDraft({ size })} /><div className="count-control" title="每次生成张数"><button aria-label="减少张数" onClick={() => editDraft({ count: Math.max(1, count - 1) })} disabled={count <= 1}>−</button><span>{count} 张</span><button aria-label="增加张数" onClick={() => editDraft({ count: Math.min(4, count + 1) })} disabled={count >= 4}>+</button></div><OptionPicker label="分组" className="group-select" value={groupId} options={groups.map(item => ({ value: item.id, label: item.name }))} onChange={groupId => editDraft({ groupId })} /></div><button className="send-button" onClick={submitComposer} disabled={!canSubmit} title={chosenStyle ? '发送并查看风格方案' : '发送对话'} aria-label={chosenStyle ? '发送风格描述' : '发送对话'}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}<span>发送</span></button></div>
+          <ImageGeometry draft={draft} onChange={editDraft}><OptionPicker label="生图模型" className="image-model-select" value={draft.imageModel} options={imageOptions.map(item => ({ value: item.id, label: item.label }))} onChange={imageModel => editDraft({ imageModel })} />{!direct && <OptionPicker label="对话模型" className="chat-model-select" value={draft.chatModel} options={chatModels.map(model => ({ value: model, label: model }))} onChange={chatModel => editDraft({ chatModel })} />}{!direct && chosenStyle && initial.features?.styleOptimization && <StyleOptimization compact style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}</ImageGeometry>
+          <div className="composer-toolbar"><div className="composer-options"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { addFiles(event.target.files || []); event.target.value = ''; }} /><button className="tool-button" onClick={() => fileInput.current?.click()} title="添加参考图片，也可将图片拖入输入框" aria-label="添加参考图片" disabled={refs.length >= 4}><Paperclip size={18} /></button><span className="toolbar-divider" /><OptionPicker label="尺寸" className="size-select" value={size} options={SIZE_OPTIONS} onChange={size => editDraft({ size, aspectRatio:'auto', pixelWidth: draft.pixelWidth || '1536', pixelHeight:draft.pixelHeight || '1024' })} /><div className="count-control" title="每次生成张数"><button aria-label="减少张数" onClick={() => editDraft({ count: Math.max(1, count - 1) })} disabled={count <= 1}>−</button><span>{count} 张</span><button aria-label="增加张数" onClick={() => editDraft({ count: Math.min(4, count + 1) })} disabled={count >= 4}>+</button></div><OptionPicker label="分组" className="group-select" value={groupId} options={groups.map(item => ({ value: item.id, label: item.name }))} onChange={groupId => editDraft({ groupId })} /></div><button className="send-button" onClick={submitComposer} disabled={!canSubmit} title={direct ? '直接生成，按中转计费' : chosenStyle ? '发送并查看风格方案' : '发送对话'} aria-label={direct ? '直接生成图片' : chosenStyle ? '发送风格描述' : '发送对话'}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}<span>{direct ? '生成' : '发送'}</span></button></div>
         </div>
-        <div className="composer-bottom"><span className="composer-hint">Enter 发送 · Shift + Enter 换行</span><span>对话与生图均按中转计费 · 生图需确认</span></div>
+        <div className="composer-bottom"><span className="composer-hint">Enter 发送 · Shift + Enter 换行</span><span>{direct ? '直出不调用对话模型 · 点击生成即提交生图' : '对话与生图均按中转计费 · 生图需确认'}</span></div>
       </section>
       </>}
       </div>

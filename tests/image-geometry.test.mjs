@@ -81,3 +81,24 @@ test('existing databases migrate additively and ratios persist across reopening'
     assert.equal(store.messages(thread.id, 1).length, 2);
   } finally { store?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
+
+
+test('paper presets produce bounded, aligned 150-DPI targets and preserve orientation on retry', () => {
+ for (const [size,mm,w,h] of [['A2',[420,594],2480,3504],['A3',[297,420],1760,2480],['A4',[210,297],1248,1760]]) {
+  const portrait=resolveImageGeometry(size),landscape=resolveImageGeometry(size,'landscape');
+  assert.deepEqual([portrait.width,portrait.height],[w,h]);assert.deepEqual([landscape.width,landscape.height],[h,w]);
+  assert.deepEqual(portrait.paper,{widthMM:mm[0],heightMM:mm[1],targetDpi:150});assert.equal(resolveImageGeometry(size,landscape.aspectRatio).requestSize,landscape.requestSize);
+  assert.deepEqual(imageSettingsForRetry({size,aspectRatio:landscape.aspectRatio}),{size,aspectRatio:landscape.aspectRatio});
+ }
+});
+
+test('custom pixels are canonicalized once and constrained before dispatch',()=>{
+ const dims=resolveImageGeometry('custom','auto',{width:1000,height:1500});assert.deepEqual(dims.pixelSize,{width:1008,height:1504});assert.equal(dims.requestSize,'1008x1504');assert.deepEqual(resolveImageGeometry('custom',dims.aspectRatio,dims.pixelSize),dims);
+ assert.deepEqual(imageSettingsForRetry({size:'custom',aspectRatio:dims.aspectRatio,context:{pixelSize:dims.pixelSize}}),{size:'custom',aspectRatio:dims.aspectRatio,pixelWidth:'1008',pixelHeight:'1504'});
+ for(const p of [undefined,null,[],{width:100,height:1000},{width:4097,height:1000},{width:1536.5,height:1000},{width:4096,height:512},{width:1024,height:1024,model:'override'}])assert.throws(()=>resolveImageGeometry('custom','auto',p));
+});
+
+test('paper and custom pixel targets are sent on both image routes',async()=>{
+ const requests=[],server=createServer(async(req,res)=>{const parts=[];for await(const part of req)parts.push(part);requests.push({path:req.url,body:Buffer.concat(parts).toString()});res.writeHead(200,{'content-type':'application/json'}).end('{"data":[]}');});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{const gateway=createGateway('http://127.0.0.1:'+server.address().port,'gpt-image-2.5-sunburst');for(const dimensions of [{size:'A4',aspectRatio:'landscape'},{size:'custom',pixelSize:{width:1000,height:1500}}])for(const references of [[],[{mime:'image/png',bytes:Buffer.from('fixture')}]]){await gateway.generate('fixture-only-key',{...dimensions,prompt:'轮椅',count:1,references});const sent=requests.at(-1),expected=dimensions.size==='A4'?'1760x1248':'1008x1504';assert.equal(sent.path,references.length?'/v1/images/edits':'/v1/images/generations');assert.ok(sent.body.includes(expected));}}finally{await new Promise(r=>server.close(r));}
+});

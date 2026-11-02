@@ -45,7 +45,7 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
         return;
       }
       const resolved = chat ? buildChatRequest(store, current) : conversationContext(store, current);
-      store.setContext(id, { ...resolved.context, ...(current.context.imageModel ? { imageModel: current.context.imageModel } : {}) });
+      store.setContext(id, { ...resolved.context, ...(current.context.imageModel ? { imageModel: current.context.imageModel } : {}), ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}), ...(current.context.generationMode ? { generationMode: current.context.generationMode, userPrompt: current.context.userPrompt, ...(current.context.style ? { style: current.context.style, styleSubject: current.context.styleSubject, styleTitle: current.context.styleTitle } : {}) } : {}) });
       let effectiveReferences = referenceIds;
       if (resolved.image) {
         effectiveReferences = (resolved.inheritedImages || [resolved.image]).map(image => store.addMedia(session.user_id, id, 'input', image.mime, image.bytes));
@@ -56,7 +56,7 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
       const references = effectiveReferences.map((mediaId) => store.media(mediaId, session.user_id));
       if (references.some((item) => !item)) throw new GatewayError('参考图已过期，请重新上传。', 400);
       if (chat) {
-        const settings = { size, count, aspectRatio, groupId, imageModel: current.context.imageModel || gateway.model };
+        const settings = { size, count, aspectRatio, groupId, imageModel: current.context.imageModel || gateway.model, ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}) };
         const payload = chatPayload(current.model, resolved.conversation, references, settings);
         if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
         originalToken = session.accessToken;
@@ -77,7 +77,7 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
       if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
       originalToken = session.accessToken;
       liveSession(store, job.sessionHash, userId, { token: originalToken });
-      const answer = await gateway.generate(key, { prompt: resolved.prompt, size, count, references, aspectRatio, model: current.model });
+      const answer = await gateway.generate(key, { prompt: resolved.prompt, size, count, references, aspectRatio, model: current.model, pixelSize: current.context.pixelSize });
       const images = Array.isArray(answer?.data) ? answer.data : [];
       let saved = 0;
       let saveFailures = 0;
