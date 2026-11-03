@@ -32,7 +32,7 @@ export default function ImageGeometry({ draft, onChange, children }) {
       {geometry?.width && <div className="geometry-preview"><span className="geometry-outline" style={{ aspectRatio: `${geometry.width} / ${geometry.height}` }} aria-hidden="true" /><span>目标 {geometry.width} × {geometry.height}</span></div>}
       {custom && <span className="geometry-help" id="ratio-help">支持 1:3～3:1</span>}
     </div>
-    {(paper || pixels) && <p className="geometry-size-note">{paper ? '纸张按约 150 DPI 换算，' : '宽高按 16 像素对齐，'}实际输出尺寸以模型返回为准。</p>}
+    {(paper || pixels) && <p className="geometry-size-note">{paper ? '纸张以约 150 DPI 为目标，' : '宽高按 16 像素对齐，'}超出模型像素范围会等比调整，以显示的目标尺寸为准。</p>}
     {(custom || paper || pixels) && error && <p className="geometry-error" id="ratio-error" role="status">{error}</p>}
   </div>;
 }

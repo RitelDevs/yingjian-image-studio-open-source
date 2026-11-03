@@ -1,6 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { resolveImageGeometry } from '../shared/image-geometry.mjs';
+import { resolveImageRequestGeometry } from './image-request-geometry.mjs';
 import { demoEditorAnswer } from './editor/demo.mjs';
 
 export class GatewayError extends Error {
@@ -86,7 +86,8 @@ export function classifyFailure(status, body) {
   }
   if (status >= 500) return new GatewayError(`上游生图服务暂时不可用，返回服务错误（${status}），本次结果尚未确认。${pending}`, 502, true, 'upstream_unavailable');
   if (status === 400 && /(?:invalid|unsupported|not supported|must be).{0,50}(?:size|dimension|aspect.?ratio)|(?:size|dimension|aspect.?ratio).{0,80}(?:invalid|unsupported|not supported|must be)|尺寸.{0,12}(?:不支持|无效)/i.test(detail)) {
-    return new GatewayError(`当前线路不支持所选画面比例或尺寸。请换用常用比例，或将比例改为“自动”后再试。${billing}`, 400, false, 'size_unsupported');
+    if (/invalid size\s*['"]?(?:1K|2K|4K)['"]?/i.test(detail)) return new GatewayError(`网站发送了上游不接受的尺寸档位名称，需要转换为像素宽高，属于接口兼容问题。请联系管理员微信 panrui12 处理；若余额有扣除，请一并核对账单。`, 400, false, 'size_unsupported');
+    return new GatewayError(`上游未接受本次请求的像素尺寸。请检查生成尺寸设置；仍失败时联系管理员微信 panrui12 处理。若余额有扣除，请一并核对账单。`, 400, false, 'size_unsupported');
   }
   if (/model|模型|images?.{0,15}edit/i.test(detail) && status === 400) {
     return new GatewayError(`当前模型不支持这次操作或参数。请调整生成设置；仍失败时联系管理员微信 panrui12 检查。${billing}`, 400, false, 'model_unsupported');
@@ -259,7 +260,7 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       return typeof answer?.content === 'string' ? answer.content : '';
     },
     async generate(key, { prompt, size, count, references, aspectRatio = 'auto', model: requestModel = model, pixelSize }) {
-      const { requestSize } = resolveImageGeometry(size, aspectRatio, pixelSize);
+      const { requestSize } = resolveImageRequestGeometry({ size, aspectRatio, pixelSize, references });
       if (demo) {
         const fs = await import('node:fs/promises');
         const { join } = await import('node:path');

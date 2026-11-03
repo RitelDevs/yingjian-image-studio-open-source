@@ -4,17 +4,20 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ASPECT_RATIOS, resolveImageGeometry, imageSettingsForRetry } from '../shared/image-geometry.mjs';
+import { ASPECT_RATIOS, IMAGE_PIXEL_LIMITS, resolveImageGeometry, imageSettingsForRetry } from '../shared/image-geometry.mjs';
 import { createStore } from '../server/store.mjs';
 import { createGateway, classifyFailure } from '../server/gateway.mjs';
 
-test('presets and custom ratios produce bounded pixel dimensions within the selected resolution tier', () => {
-  for (const [size, edge] of [['1K', 1024], ['2K', 2048], ['4K', 4096]]) {
-    assert.equal(resolveImageGeometry(size).requestSize, size);
+test('all preset proportions produce aligned dimensions within native edge, ratio and pixel limits', () => {
+  for (const size of ['1K', '2K', '4K']) {
+    assert.equal(resolveImageGeometry(size).requestSize, 'auto');
     for (const ratio of [...ASPECT_RATIOS, '5:4', '21:9', '1:3', '3:1']) {
       const result = resolveImageGeometry(size, ratio);
       const [w, h] = ratio.split(':').map(Number);
-      assert.equal(Math.max(result.width, result.height), edge);
+      assert(Math.max(result.width, result.height) <= IMAGE_PIXEL_LIMITS.maxEdge);
+      assert(result.width * result.height >= IMAGE_PIXEL_LIMITS.minPixels);
+      assert(result.width * result.height <= IMAGE_PIXEL_LIMITS.maxPixels);
+      assert(result.width <= result.height * 3 && result.height <= result.width * 3);
       assert.equal(result.width % 16, 0);
       assert.equal(result.height % 16, 0);
       assert(Math.abs((result.width / result.height) / (w / h) - 1) < .025);
@@ -34,7 +37,8 @@ test('invalid dimensions cannot bypass the shared request constraints', () => {
   assert.throws(() => resolveImageGeometry('9000x9000', '1:1'));
   const failure = classifyFailure(400, { error: { message: 'Invalid size: dimensions must be supported' } });
   assert.equal(failure.reason, 'size_unsupported');
-  assert.match(failure.message, /比例或尺寸.*自动/);
+  assert.match(failure.message, /未接受.*像素尺寸/);
+  assert.doesNotMatch(failure.message, /改为.*自动/);
 });
 
 test('generation JSON and reference-image multipart both forward requested geometry and keep prompts unchanged', async () => {
@@ -57,7 +61,7 @@ test('generation JSON and reference-image multipart both forward requested geome
     assert.match(requests[1].contentType, /multipart/);
     assert.match(requests[1].body, /name="size"\r\n\r\n1152x2048/);
     await gateway.generate('local-fixture', { ...input, aspectRatio: 'auto' });
-    assert.equal(JSON.parse(requests[2].body).size, '2K');
+    assert.equal(JSON.parse(requests[2].body).size, '2048x2048');
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
@@ -83,10 +87,12 @@ test('existing databases migrate additively and ratios persist across reopening'
 });
 
 
-test('paper presets produce bounded, aligned 150-DPI targets and preserve orientation on retry', () => {
- for (const [size,mm,w,h] of [['A2',[420,594],2480,3504],['A3',[297,420],1760,2480],['A4',[210,297],1248,1760]]) {
+test('paper presets fit API bounds and preserve paper orientation and canonical retry size', () => {
+ for (const [size,mm,w,h] of [['A2',[420,594]],['A3',[297,420],1760,2480],['A4',[210,297],1248,1760]]) {
   const portrait=resolveImageGeometry(size),landscape=resolveImageGeometry(size,'landscape');
-  assert.deepEqual([portrait.width,portrait.height],[w,h]);assert.deepEqual([landscape.width,landscape.height],[h,w]);
+  if(w) assert.deepEqual([portrait.width,portrait.height],[w,h]);
+  assert.deepEqual([landscape.width,landscape.height],[portrait.height,portrait.width]);
+  assert(portrait.width*portrait.height<=8294400); assert(Math.abs(portrait.width/portrait.height-mm[0]/mm[1])<.01);
   assert.deepEqual(portrait.paper,{widthMM:mm[0],heightMM:mm[1],targetDpi:150});assert.equal(resolveImageGeometry(size,landscape.aspectRatio).requestSize,landscape.requestSize);
   assert.deepEqual(imageSettingsForRetry({size,aspectRatio:landscape.aspectRatio}),{size,aspectRatio:landscape.aspectRatio});
  }
@@ -96,6 +102,10 @@ test('custom pixels are canonicalized once and constrained before dispatch',()=>
  const dims=resolveImageGeometry('custom','auto',{width:1000,height:1500});assert.deepEqual(dims.pixelSize,{width:1008,height:1504});assert.equal(dims.requestSize,'1008x1504');assert.deepEqual(resolveImageGeometry('custom',dims.aspectRatio,dims.pixelSize),dims);
  assert.deepEqual(imageSettingsForRetry({size:'custom',aspectRatio:dims.aspectRatio,context:{pixelSize:dims.pixelSize}}),{size:'custom',aspectRatio:dims.aspectRatio,pixelWidth:'1008',pixelHeight:'1504'});
  for(const p of [undefined,null,[],{width:100,height:1000},{width:4097,height:1000},{width:1536.5,height:1000},{width:4096,height:512},{width:1024,height:1024,model:'override'}])assert.throws(()=>resolveImageGeometry('custom','auto',p));
+ for(const pixelSize of [{width:512,height:512},{width:4096,height:4096},{width:4096,height:1536},{width:512,height:1536}]){
+  const g=resolveImageGeometry('custom','auto',pixelSize);assert(g.width<=3840&&g.height<=3840);assert(g.width*g.height>=655360&&g.width*g.height<=8294400);
+  assert(g.width<=g.height*3&&g.height<=g.width*3);assert.deepEqual(resolveImageGeometry('custom',g.aspectRatio,g.pixelSize),g);
+ }
 });
 
 test('paper and custom pixel targets are sent on both image routes',async()=>{

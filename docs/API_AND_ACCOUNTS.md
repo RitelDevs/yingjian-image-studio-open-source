@@ -126,6 +126,8 @@ Turnstile 配置仍取自 Sub2API；本站转交单次验证证明，并区分�
 
 会话模式POST /api/chat，生成方案后仍通过/confirm显式确认；直出POST /api/jobs，点击生成即提交付费图片请求。直出支持styleId/styleVersion/styleSubject/title/styleSelectionId，服务端按固定配方编译并核对撤销，不调用对话或专业优化。前端直出不继承未明确附加的历史参考图。
 
-size新增A2/A3/A4：以ISO纸张毫米420×594、297×420、210×297按约150DPI及16像素对齐换算请求尺寸，可横竖切换；这些是生成像素目标，不承诺模型返回精确尺寸，也不添加打印机或文件DPI元数据。size=custom时须传pixelSize={width,height}整数512–4096px、比例1:3–3:1，服务端16像素对齐并存于消息上下文/方案设置。确认请求不能改变已保存尺寸。旧1K/2K/4K与自定义比例接口保持。
+size支持A2/A3/A4：以ISO纸张毫米420×594、297×420、210×297按约150DPI作为像素目标，可横竖切换。size=custom时须传pixelSize={width,height}整数512–4096px、比例1:3–3:1。所有目标均按16像素对齐并适配模型范围：单边≤3840，总像素655360–8294400，比例1:3–3:1；不足最小像素时放大，超过边长/总像素时缩小，显示并保存实际目标。A2约为2416×3408；4K横向16:9为3840×2160，4K方图为2880×2880。这些是生成像素目标，不承诺模型返回精确尺寸，不添加文件DPI元数据。确认请求不能改变已保存尺寸。
+
+浏览器到网站API仍用size=1K/2K/4K等档位；网站到上游的/v1/images/generations和/v1/images/edits均转为WIDTHxHEIGHT，不能发送档位名称。aspectRatio=auto优先跟随首张可读PNG/JPEG/WebP参考图的编码宽高，比例限制在1:3–3:1；没有可读参考图时使用方图。不会解码、裁剪或重写上传图像。约束依据：[OpenAI官方图像参数文档](https://developers.openai.com/api/docs/guides/image-prompting)。
 
 长回复折叠只影响展示，完整提示词始终保留，确认按钮在折叠区域外；提交/计费逻辑不依赖展开状态。
