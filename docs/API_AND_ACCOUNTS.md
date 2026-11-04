@@ -131,3 +131,13 @@ size支持A2/A3/A4：以ISO纸张毫米420×594、297×420、210×297按约150DP
 浏览器到网站API仍用size=1K/2K/4K等档位；网站到上游的/v1/images/generations和/v1/images/edits均转为WIDTHxHEIGHT，不能发送档位名称。aspectRatio=auto优先跟随首张可读PNG/JPEG/WebP参考图的编码宽高，比例限制在1:3–3:1；没有可读参考图时使用方图。不会解码、裁剪或重写上传图像。约束依据：[OpenAI官方图像参数文档](https://developers.openai.com/api/docs/guides/image-prompting)。
 
 长回复折叠只影响展示，完整提示词始终保留，确认按钮在折叠区域外；提交/计费逻辑不依赖展开状态。
+## 生图 Key 连接恢复（1.5.8）
+
+图片站保留“用户 × 分组”的个人 Key 连接；首次使用的创建流程不变。已有连接在每次生图、会话、专业优化或编辑对话前，通过当前登录会话读取原 Key，核对归属、内容、状态、有效期及分组。登录/查询服务失败不视为 Key 删除。
+
+- `GET /api/key-connection?groupId=N`：只读检查当前用户的可用分组，返回 `state/groupId/keyId`，不返回凭证、不创建 Key。删除、停用、过期、分组变更、连接不一致与查询不可用分别处理。
+- `POST /api/key-connection`：需沿用当前账号/来源/CSRF 校验，提交 `{groupId, expectedKeyId, confirmed:true}`。这是用户明确选择新建连接的动作；有效连接直接复用，并发恢复只创建一次。原 Key 的启用状态、分组及额度不被改写。
+- 新 Key 只替换当前用户当前分组的本地连接；这一步不会调用模型，也不会重发历史任务。用户重新启用原 Key 后，检查成功即可继续复用。
+- 创建前写入 `key_creation_pending`；网络中断、5xx 或无法确认的创建响应保留待核对状态，重启后仍阻止重复创建。管理员须先用用户 Key 管理 API 核对创建结果，再决定绑定已创建 Key 或清除已证实未创建的 intent；不要凭超时直接重发。
+
+`key_creation_pending` 为新增表，应用回退可保留该表。回退不得回灌旧业务数据库或丢弃新连接；若回到缺乏此保护的旧版本，未知创建必须先独立核对，不能继续提交任务。

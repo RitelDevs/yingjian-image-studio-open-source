@@ -38,6 +38,10 @@ export function createStore(directory) {
       user_id INTEGER NOT NULL, group_id INTEGER NOT NULL, key_id INTEGER,
       encrypted_key TEXT NOT NULL, PRIMARY KEY (user_id, group_id)
     );
+    CREATE TABLE IF NOT EXISTS key_creation_pending (
+      user_id INTEGER NOT NULL, group_id INTEGER NOT NULL, created_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, group_id)
+    );
     CREATE TABLE IF NOT EXISTS threads (
       id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT NOT NULL,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -222,6 +226,9 @@ export function createStore(directory) {
       const row = db.prepare('SELECT * FROM api_keys WHERE user_id=? AND group_id=?').get(userId, groupId);
       return row && { key: decrypt(row.encrypted_key), keyId: row.key_id };
     },
+    keyCreationPending(userId, groupId) { return Boolean(db.prepare('SELECT 1 FROM key_creation_pending WHERE user_id=? AND group_id=?').get(userId, groupId)); },
+    beginKeyCreation(userId, groupId) { db.prepare('INSERT INTO key_creation_pending VALUES (?,?,?)').run(userId, groupId, Date.now()); },
+    finishKeyCreation(userId, groupId) { db.prepare('DELETE FROM key_creation_pending WHERE user_id=? AND group_id=?').run(userId, groupId); },
     putKey(userId, groupId, key, keyId) {
       db.prepare(`INSERT INTO api_keys VALUES (?, ?, ?, ?) ON CONFLICT(user_id,group_id)
         DO UPDATE SET key_id=excluded.key_id, encrypted_key=excluded.encrypted_key`)

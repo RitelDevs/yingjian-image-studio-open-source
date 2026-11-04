@@ -17,6 +17,7 @@ const defaultStyle = STYLE_CATALOG.find(style => style.id === 'retro-poster');
 async function fixture(t, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'studio-style-test-'));
   const calls = { images: [], chats: [], keys: [], wire: [] };
+  const keys = new Map();
   const groups = [{ id: 2, name: '本地测试', platform: 'openai', allow_image_generation: true }];
   const profile = token => ({ id: Number(token), email: `${token}@example.invalid`, balance: 10, status: 'active' });
   let upstream;
@@ -40,7 +41,13 @@ async function fixture(t, options = {}) {
     login: async email => { const id = email.startsWith('other') ? '2' : '1'; return { user: profile(id), access_token: id, expires_in: 3600 }; },
     profile: async token => profile(token),
     groups: async () => { if (options.groupCheck) await options.groupCheck(); return groups; },
-    createKey: async (token, groupId) => { calls.keys.push({ token, groupId }); return { id: 1, key: 'local-test-placeholder-key' }; },
+    createKey: async (token, groupId) => {
+      calls.keys.push({ token, groupId });
+      const row = { id: Number(token), user_id: Number(token), group_id: groupId, group_ids: [groupId],
+        key: 'local-test-placeholder-key', status: 'active', expires_at: null };
+      keys.set(row.id, row); return row;
+    },
+    getKey: async (token, id) => { const row = keys.get(id); assert.equal(row.user_id, Number(token)); return row; },
     converse: async (_, payload) => { calls.chats.push(payload); if (options.converse) return options.converse(payload); return JSON.stringify({ reply: '请确认。', ready: true, prompt: '普通对话整理的蓝色椅子。' }); },
     generate: async (key, payload) => { calls.images.push(payload); return real ? real.generate(key, payload) : { data: Array.from({ length: payload.count }, () => ({ b64_json: png })) }; }
   };

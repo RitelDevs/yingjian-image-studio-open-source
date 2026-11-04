@@ -14,6 +14,7 @@ const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwM
 async function setup(overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'studio-test-'));
   const calls = { createKey: 0, generate: 0, login: 0, createdKeys: [], generatedKeys: [] };
+  const keys = new Map();
   const gateway = {
     model: 'gpt-image-2.5',
     login: async (email) => {
@@ -31,8 +32,10 @@ async function setup(overrides = {}) {
       const id = Number(token.slice(6));
       const key = `sk-user-${id}-group-${groupId}-fixture-123456789`;
       calls.createdKeys.push({ userId: id, groupId, key });
-      return { id: 99 + id, key };
+      const row = { id: 99 + id, user_id: id, group_id: groupId, group_ids: [groupId], key, status: 'active', expires_at: null };
+      keys.set(row.id, row); return row;
     },
+    getKey: async (token, id) => { const row = keys.get(id); assert.equal(row.user_id, Number(token.slice(6))); return row; },
     logout: async () => {},
     generate: async (_key, input) => {
       calls.generate++;

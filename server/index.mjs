@@ -179,6 +179,17 @@ function buildApplication(options, sub2apiAccount) {
       return send(res, 200, { user: auth.user }, { 'set-cookie': cookie(token) });
     }
     const session = await authenticated(req);
+    if (path === '/api/key-connection' && ['GET', 'POST'].includes(req.method)) {
+      const input = req.method === 'GET' ? { groupId: Number(new URL(req.url, 'http://studio.invalid').searchParams.get('groupId')) } : await parseJson(req, 4096);
+      if (!Number.isSafeInteger(input?.groupId) || input.groupId < 1) throw new GatewayError('请选择可用的生图分组。', 400);
+      const groups = groupList(await gateway.groups(session.accessToken, session.context));
+      if (!groups.some(group => group.id === input.groupId)) throw new GatewayError('当前账号不能使用所选分组。', 403);
+      if (req.method === 'GET') return send(res, 200, await ensureKey.inspect(session, input.groupId));
+      if (input.confirmed !== true || input.expectedKeyId !== null && (!Number.isSafeInteger(input.expectedKeyId) || input.expectedKeyId < 1)) {
+        throw new GatewayError('请先检查连接，并明确确认创建新的生图 Key。', 400);
+      }
+      return send(res, 200, await ensureKey.reconnect(session, input.groupId, input.expectedKeyId));
+    }
     if (path === '/api/editor/chat' && req.method === 'POST') {
       if (integration) throw new GatewayError('管理员生图联调入口暂不提供编辑对话，请使用普通登录入口。', 403);
       const input = await parseJson(req, 12 * 1024 * 1024);
@@ -474,7 +485,7 @@ function buildApplication(options, sub2apiAccount) {
     } catch (error) {
       if (res.headersSent) return res.end();
       const known = error instanceof GatewayError;
-      send(res, known ? error.status : 500, { error: known ? error.message : '服务暂时不可用，请联系管理员微信 panrui12。' });
+      send(res, known ? error.status : 500, { error: known ? error.message : '服务暂时不可用，请联系管理员微信 panrui12。', ...(known ? { code: error.reason } : {}) });
     }
   }
   const server = createServer((req, res) => {

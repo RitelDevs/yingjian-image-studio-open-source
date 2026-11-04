@@ -12,13 +12,14 @@ test('observed upstream failures provide distinct reasons and recovery without l
     [429, 'insufficient_quota', /上游生图服务的可用额度/, 'upstream_quota', false],
     [429, 'Too many requests', /触发限流.*稍后再试/, 'rate_limited', false],
     [504, 'Gateway timeout', /等待上游生图响应超时.*请勿立即/, 'upstream_timeout', true],
-    [401, 'Expired credential', /访问凭证已失效.*重新登录/, 'authentication_expired', false],
+    [401, 'Expired credential', /生图 Key 验证失败.*检查生图连接.*删除或停用/, 'studio_key_rejected', false],
     [403, 'Access denied', /访问权限.*更换可用分组/, 'access_denied', false]
   ]) {
     const failure = classifyFailure(status, { error: { message: `${detail} sk-private-fixture-do-not-display` } });
     assert.match(failure.message, expected);
     assert.equal(failure.reason, reason);
     assert.equal(failure.uncertain, uncertain);
+    if (status === 401) { assert.equal(failure.status, 409); assert.doesNotMatch(failure.message, /重新登录/); }
     assert.match(failure.message, /panrui12/);
     assert.doesNotMatch(failure.message, /sk-private|不会扣费|已退款/);
     if (reason === 'upstream_quota') assert.doesNotMatch(failure.message, /余额不足|充值/);
@@ -40,6 +41,30 @@ test('network failures distinguish waiting, interrupted result transfer, and dis
     assert.match(failure.message, /请勿立即重复提交.*panrui12/);
     assert.doesNotMatch(failure.message, /private transport/);
   }
+});
+
+test('key lookup uses the native account endpoint and distinguishes deletion from login and service failures', async () => {
+  let status = 200;
+  const requests = [];
+  const row = { id: 41, user_id: 7, group_id: 12, group_ids: [12], key: 'fixture-read-only-personal-key', status: 'active', expires_at: null };
+  const upstream = createServer((req, res) => {
+    requests.push({ path: req.url, method: req.method, authorization: req.headers.authorization });
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(status === 200 ? { code: 0, data: row } : { message: 'private fixture diagnostic' }));
+  });
+  await new Promise(resolve => upstream.listen(0, '127.0.0.1', resolve));
+  try {
+    const gateway = createGateway('http://127.0.0.1:' + upstream.address().port, 'gpt-image-2.5');
+    assert.deepEqual(await gateway.getKey('fixture-account-access', 41), row);
+    for (const [httpStatus, reason] of [[404, 'key_not_found'], [401, 'authentication_expired'], [503, 'account_unavailable']]) {
+      status = httpStatus;
+      await assert.rejects(gateway.getKey('fixture-account-access', 41), error =>
+        error.reason === reason && !error.message.includes('private fixture'));
+    }
+    assert.equal(requests.length, 4);
+    assert.ok(requests.every(request => request.path === '/api/v1/keys/41' && request.method === 'GET'
+      && request.authorization === 'Bearer fixture-account-access'));
+  } finally { await new Promise(resolve => upstream.close(resolve)); }
 });
 
 test('invalid successful responses remain uncertain and HTML service errors retain their HTTP cause', async () => {

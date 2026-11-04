@@ -19,6 +19,7 @@ import { useSelectionSurface } from './useSelectionSurface.js';
 import ImageGeometry from './ImageGeometry.jsx';
 import OptionPicker from './OptionPicker.jsx';
 import ProposalCard from './ProposalCard.jsx';
+import KeyConnection from './KeyConnection.jsx';
 import StyleMarket from './StyleMarket.jsx';
 import StyleOptimization from './StyleOptimization.jsx';
 import ImageViewer from './ImageViewer.jsx';
@@ -429,6 +430,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
         </div>
       </main>
       <section className="composer-wrap" aria-label="生图输入">
+        <KeyConnection key={groupId} groupId={groupId} refreshToken={messages.at(-1)?.updatedAt} />
         {notice && <div className="notice" role="status">{notice}{styleCancellationPending && <button className="style-cancel-retry" onClick={retryStyleCancellation}>重试取消</button>}<button className="icon-button" title="关闭提示" aria-label="关闭提示" onClick={() => setNotice('')}><X size={15} /></button></div>}
         <div className="composer" ref={composerRef} data-file-drop={drop.state}>
           <div className="composer-drop-overlay" aria-hidden="true"><div className="composer-drop-feedback"><span className="composer-drop-icon"><ImageUp size={24} strokeWidth={1.7} /></span><strong>{dropTitle}</strong><span>{dropHint}</span></div></div>

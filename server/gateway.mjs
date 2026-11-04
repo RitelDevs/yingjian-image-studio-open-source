@@ -14,6 +14,7 @@ export class GatewayError extends Error {
 
 // Account operations have their own errors; never describe a login as an image request.
 export function classifyAccountFailure(status, body, path) {
+  if (status === 404 && /^\/api\/v1\/keys\/\d+$/.test(path)) return new GatewayError('生图 Key 已被删除。', 404, false, 'key_not_found');
   const login = path === '/api/v1/auth/login';
   const twoFactor = path === '/api/v1/auth/login/2fa';
   const signingIn = login || twoFactor;
@@ -76,7 +77,7 @@ export function classifyFailure(status, body) {
   if (status === 402 || /余额不足|insufficient.{0,20}(balance|credit)/i.test(detail)) {
     return new GatewayError('账户余额不足，无法继续生成。请联系管理员微信 panrui12 充值。', 402, false, 'balance_insufficient');
   }
-  if (status === 401) return new GatewayError(`中转登录或访问凭证已失效。请退出后重新登录；仍失败时联系管理员微信 panrui12 检查。${billing}`, 401, false, 'authentication_expired');
+  if (status === 401) return new GatewayError(`生图 Key 验证失败，请检查生图连接及 Key 是否已被删除或停用。${billing}`, 409, false, 'studio_key_rejected');
   if (status === 403) return new GatewayError(`当前账号或所选分组没有本次生图的访问权限。请更换可用分组，或联系管理员微信 panrui12 检查。${billing}`, 403, false, 'access_denied');
   if (/did not execute image generation|未执行生图/i.test(detail)) {
     return new GatewayError(`上游返回“未执行生图”，网站没有收到图片。${pending}`, 502, true, 'upstream_no_generation');
@@ -222,7 +223,7 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
     profile: (token, context) => demo ? demoUser() : request('/api/v1/auth/me', { token, context }),
     groups: (token, context) => demo ? [{ id: 2, name: '图片创作', platform: 'openai', allow_image_generation: true, rate_multiplier: 1 }] : request('/api/v1/groups/available', { token, context }),
     createKey: (token, groupId, context) => demo ? { id: 1, key: 'demo-key-for-local-preview' } : request('/api/v1/keys', { method: 'POST', token, context, body: { name: options.keyName || 'Ritel.SI Visora在线生图', group_id: groupId, ...(options.keyExpiresInDays ? { expires_in_days: options.keyExpiresInDays } : {}) } }),
-    getKey: (token, id, context) => request(`/api/v1/keys/${Number(id)}`, { token, context }),
+    getKey: (token, id, context) => demo ? { id, user_id: 900001, key: 'demo-key-for-local-preview', status: 'active', group_id: 2 } : request(`/api/v1/keys/${Number(id)}`, { token, context }),
     deleteKey: (token, id, context) => request(`/api/v1/keys/${Number(id)}`, { method: 'DELETE', token, context }),
     logout: (refreshToken) => demo ? Promise.resolve() : request('/api/v1/auth/logout', { method: 'POST', body: { refresh_token: refreshToken } }),
     async converse(key, payload, context = {}) {
@@ -249,7 +250,7 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       const json = await response.json().catch(() => ({}));
       if (!response.ok || json?.error) {
         if (classifyFailure(response.status, json).reason === 'content_refused') return JSON.stringify({ reply: '这项对话请求或参考图未通过内容审核，请调整描述后继续。尚未提交生图；若发现费用异常，请联系管理员微信 panrui12 核对。', ready: false, prompt: '' });
-        if (response.status === 401) throw new GatewayError('对话访问凭证已失效，请重新登录后再试。', 401, false, 'chat_authentication');
+        if (response.status === 401) throw new GatewayError('对话 Key 验证失败，请检查生图连接及 Key 是否已被删除或停用。', 409, false, 'studio_key_rejected');
         if (response.status === 402) throw new GatewayError('对话账户余额不足，请联系管理员微信 panrui12 充值。', 402, false, 'chat_balance');
         if (response.status === 429) throw new GatewayError('对话服务当前繁忙或额度受限，请稍后再试；尚未提交生图。', 429, false, 'chat_rate_limited');
         throw new GatewayError('当前分组暂时无法使用对话模型，请更换分组或联系管理员微信 panrui12 检查。尚未提交生图。', 502, true, 'chat_unavailable');

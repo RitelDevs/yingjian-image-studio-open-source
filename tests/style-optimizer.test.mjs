@@ -25,6 +25,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 async function fixture(t, options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'studio-professional-test-'));
   const calls = { chat: [], images: [], keys: 0 };
+  const keys = new Map();
   const groups = [{ id: 2, platform: 'openai', name: '测试分组', allow_image_generation: true }];
   const user = token => ({ id: Number(token), email: `${token}@example.invalid`, balance: 10, status: 'active' });
   const gateway = {
@@ -32,7 +33,13 @@ async function fixture(t, options = {}) {
     login: async email => { const id = email.startsWith('other') ? '2' : '1'; return { user: user(id), access_token: id, expires_in: 3600 }; },
     profile: async token => user(token),
     groups: async () => { if (options.groups) await options.groups(); return groups; },
-    createKey: async () => { calls.keys++; if (options.key) await options.key(); return { id: 1, key: 'local-professional-test-key' }; },
+    createKey: async (token, groupId) => {
+      calls.keys++; if (options.key) await options.key();
+      const row = { id: Number(token), user_id: Number(token), group_id: groupId, group_ids: [groupId],
+        key: 'local-professional-test-key', status: 'active', expires_at: null };
+      keys.set(row.id, row); return row;
+    },
+    getKey: async (token, id) => { const row = keys.get(id); assert.equal(row.user_id, Number(token)); return row; },
     converse: async (_, payload) => { calls.chat.push(payload); return options.converse ? options.converse(payload) : answer(); },
     generate: async (_, payload) => { calls.images.push(payload); return { data: [{ b64_json: png }] }; }
   };

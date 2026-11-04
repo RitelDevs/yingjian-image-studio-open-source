@@ -31,6 +31,7 @@ async function until(predicate) {
 async function fixture(options = {}) {
   const directory = options.directory || mkdtempSync(join(tmpdir(), 'studio-editor-test-'));
   const calls = { chats: [], images: [], keys: [], refreshes: [] };
+  const keys = new Map();
   const groups = [{ id: 2, name: '图片创作', platform: 'openai', allow_image_generation: true }];
   const profile = token => ({ id: Number(token), email: token + '@example.invalid', balance: 10, status: 'active', role: 'admin' });
   const gateway = {
@@ -39,7 +40,13 @@ async function fixture(options = {}) {
     refresh: async token => { calls.refreshes.push(token); return { access_token: token.split('-').at(-1), expires_in: 3600 }; },
     profile: async token => options.profile ? options.profile(token) : profile(token),
     groups: async token => options.groups ? options.groups(token, groups) : groups,
-    createKey: async (token, groupId) => { calls.keys.push({ token, groupId }); if (options.keyDelay) await sleep(options.keyDelay); return { id: Number(token), key: 'fixture-user-' + token + '-group-' + groupId }; },
+    createKey: async (token, groupId) => {
+      calls.keys.push({ token, groupId }); if (options.keyDelay) await sleep(options.keyDelay);
+      const row = { id: Number(token), user_id: Number(token), group_id: groupId, group_ids: [groupId],
+        key: 'fixture-user-' + token + '-group-' + groupId, status: 'active', expires_at: null };
+      keys.set(row.id, row); return row;
+    },
+    getKey: async (token, id) => { const row = keys.get(id); assert.equal(row.user_id, Number(token)); return row; },
     converse: async (key, payload, context) => { calls.chats.push({ key, payload, context }); return options.converse ? options.converse(payload, calls.chats.length, context) : reply(); },
     generate: async (key, payload) => { calls.images.push({ key, payload }); return { data: [{ b64_json: png }] }; },
     logout: async () => {}

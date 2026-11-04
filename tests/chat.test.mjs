@@ -16,13 +16,19 @@ const answer = (prompt = '蓝色椅子，白色背景，写实摄影。') => JSO
 async function fixture(options = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'studio-chat-test-'));
   const calls = { chats: [], images: [] };
+  const keys = new Map();
   const groups = [{ id: 2, name: '本地测试', platform: 'openai', allow_image_generation: true }];
   const profile = token => ({ id: Number(token), email: `${token}@example.invalid`, balance: 10, status: 'active' });
   const gateway = {
     model: 'gpt-image-2.5',
     login: async email => ({ user: profile(email.startsWith('other') ? '2' : '1'), access_token: email.startsWith('other') ? '2' : '1', expires_in: 3600 }),
     profile: async token => profile(token), groups: async () => groups,
-    createKey: async (token, groupId) => ({ id: Number(token), key: `fixture-user-${token}-group-${groupId}` }),
+    createKey: async (token, groupId) => {
+      const row = { id: Number(token), user_id: Number(token), group_id: groupId, group_ids: [groupId],
+        key: `fixture-user-${token}-group-${groupId}`, status: 'active', expires_at: null };
+      keys.set(row.id, row); return row;
+    },
+    getKey: async (token, id) => { const row = keys.get(id); assert.equal(row.user_id, Number(token)); return row; },
     converse: async (key, payload) => { calls.chats.push({ key, payload }); return options.converse ? options.converse(payload, calls.chats.length) : answer(); },
     generate: async (key, payload) => { calls.images.push({ key, payload }); return options.generate ? options.generate(payload) : { data: Array.from({ length: payload.count }, () => ({ b64_json: png })) }; }
   };

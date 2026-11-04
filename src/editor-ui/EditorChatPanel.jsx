@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, LoaderCircle, MessageCircle, RefreshCw, Sparkles, AlertCircle } from 'lucide-react';
 import { useEditorChat } from './useEditorChat.js';
+import KeyConnection from '../KeyConnection.jsx';
 
 const labels = { sending: '准备画面', queued: '等待回复', running: '正在看图', applied: '已应用', 'not-applied': '未应用', replied: '已回复', failed: '失败', unknown: '待查询' };
 const examples = ['调亮一点，保留自然色彩', '降低饱和度，再暖一点', '试试柔和的复古感觉'];
@@ -40,6 +41,7 @@ export default function EditorChatPanel({ editor, userId, groups, defaultGroupId
       </article>)}<span ref={bottom} />
     </div>
     <form className="ed-chat-form" onSubmit={submit}>
+      <KeyConnection key={groupId} groupId={Number(groupId)} refreshToken={chat.entries.at(-1)?.status} />
       {demo && <div className="ed-chat-demo">演示模式 · 当前为模拟回复，不扣费</div>}
       {cropMode && <div className="ed-chat-note">应用或取消裁剪后，就可以继续对话。</div>}
       {issue && <p className="ed-chat-error" role="alert">{issue}</p>}
