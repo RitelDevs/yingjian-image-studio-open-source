@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ImagePlus, Library, LoaderCircle, Search, Shirt, PersonStanding, X, ArrowUpRight } from 'lucide-react';
 import './reference-library.css';
 
-export default function ReferenceLibrary({ onBack, onImport, existingCount, blocked }) {
-  const [data,setData]=useState(null),[error,setError]=useState(''),[kind,setKind]=useState('pose'),[query,setQuery]=useState(''),[collection,setCollection]=useState('全身单人・标准系'),[category,setCategory]=useState('全部'),[angle,setAngle]=useState('正面'),[limit,setLimit]=useState(36),[detail,setDetail]=useState(null),[selection,setSelection]=useState([]),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0);
+export default function ReferenceLibrary({ onBack, onImport, existingCount, blocked, selection, onSelectionChange: setSelection }) {
+  const [data,setData]=useState(null),[error,setError]=useState(''),[kind,setKind]=useState('pose'),[query,setQuery]=useState(''),[collection,setCollection]=useState('全身单人・标准系'),[category,setCategory]=useState('全部'),[angle,setAngle]=useState('正面'),[limit,setLimit]=useState(36),[detail,setDetail]=useState(null),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0);
   const scroll=useRef(null),heading=useRef(null),live=useRef(true),importing=useRef(false);
   useEffect(()=>{ live.current=true;return()=>{live.current=false;}; },[]);
   useEffect(()=>{const controller=new AbortController();setError('');fetch('/reference-library/catalog.json',{signal:controller.signal}).then(async r=>{if(!r.ok)throw new Error('本地参考图库尚未连接，请重新加载。');return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[retry]);

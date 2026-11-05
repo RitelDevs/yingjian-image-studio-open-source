@@ -259,6 +259,12 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   const editorTrigger = useRef(null);
   const [marketOpen, setMarketOpen] = useState(() => location.hash === '#styles');
   const [libraryOpen, setLibraryOpen] = useState(() => initial.features?.referenceLibrary && location.hash === '#references');
+  const [librarySelections, setLibrarySelections] = useState({});
+  const librarySelectionKey = activeId || 'new';
+  const librarySelection = librarySelections[librarySelectionKey] || [];
+  function changeLibrarySelection(update) {
+    setLibrarySelections(current => ({ ...current, [librarySelectionKey]: typeof update === 'function' ? update(current[librarySelectionKey] || []) : update }));
+  }
   const libraryThread = useRef(activeId);
   const marketSession = useRef(0);
   const pendingStyleFocus = useRef(null);
@@ -341,6 +347,8 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     if (activeThread.current !== libraryThread.current) throw new Error('当前创作已切换，请重新打开图库选择。');
     const added = addFiles(files);
     if (!added) throw new Error('没有添加参考图，当前创作可能已达到 4 张上限。');
+    // Consume only successfully attached images; preserve any unaccepted choices.
+    changeLibrarySelection(current => current.slice(added));
     backToCreation(false);
     setNotice(`已添加 ${added} 张图库参考。补充你的要求后发送，参考图会随本轮请求提交。`);
     requestAnimationFrame(() => textInput.current?.focus({preventScroll:true}));
@@ -443,7 +451,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
       {initial.demo && <div className="demo-strip">本地预览 · 图片和余额为示例，不调用中转</div>}
       {initial.integration && <div className="demo-strip integration-strip">管理员真实联调 · 按中转价格扣费 · 本轮最多 {initial.integration.maxJobs} 个单图请求</div>}
       <div className={`workspace-stage${marketOpen ? ' is-market' : libraryOpen ? ' is-library' : isEmpty ? ' is-empty' : ''}`}>
-      {libraryOpen ? <ReferenceLibrary onBack={() => backToCreation(false)} onImport={importLibraryFiles} existingCount={refs.length} blocked={sending || sessionBlocked} /> : marketOpen ? <StyleMarket optimizationAvailable={initial.features?.styleOptimization === true} demo={initial.demo} onChooseStyle={chooseMarketStyle} draft={draft} groups={groups} prepareStylePlan={prepareMarketPlan} onBack={backToCreation} onPrepared={() => {}} addFiles={addFiles} removeRef={removeRef} notice={notice} onClearNotice={() => setNotice('')} referenceDropRef={marketDropRef} subjectInputRef={marketSubjectRef} dropState={drop.state} blocked={sending || messages.some(turn => turn.kind === 'chat' && ['queued', 'running'].includes(turn.status))} /> : <>
+      {libraryOpen ? <ReferenceLibrary key={librarySelectionKey} onBack={() => backToCreation(false)} onImport={importLibraryFiles} existingCount={refs.length} blocked={sending || sessionBlocked} selection={librarySelection} onSelectionChange={changeLibrarySelection} /> : marketOpen ? <StyleMarket optimizationAvailable={initial.features?.styleOptimization === true} demo={initial.demo} onChooseStyle={chooseMarketStyle} draft={draft} groups={groups} prepareStylePlan={prepareMarketPlan} onBack={backToCreation} onPrepared={() => {}} addFiles={addFiles} removeRef={removeRef} notice={notice} onClearNotice={() => setNotice('')} referenceDropRef={marketDropRef} subjectInputRef={marketSubjectRef} dropState={drop.state} blocked={sending || messages.some(turn => turn.kind === 'chat' && ['queued', 'running'].includes(turn.status))} /> : <>
       <main className="conversation" id="main-content" aria-label="创作对话" aria-busy={loading}>
         <div className="conversation-inner">
           {loading && <div className="thread-load-state" role="status"><LoaderCircle className="spin" size={20} /><span>正在加载创作记录…</span></div>}
