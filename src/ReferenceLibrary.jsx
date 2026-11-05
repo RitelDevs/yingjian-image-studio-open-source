@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ImagePlus, Library, LoaderCircle, Search, Shirt, PersonStanding, X, ArrowUpRight } from 'lucide-react';
 import './reference-library.css';
+import { useSelectionSurface } from './useSelectionSurface.js';
 
 export default function ReferenceLibrary({ onBack, onImport, existingCount, blocked, selection, onSelectionChange: setSelection }) {
   const [data,setData]=useState(null),[error,setError]=useState(''),[kind,setKind]=useState('pose'),[query,setQuery]=useState(''),[collection,setCollection]=useState('全身单人・标准系'),[category,setCategory]=useState('全部'),[angle,setAngle]=useState('正面'),[limit,setLimit]=useState(36),[detail,setDetail]=useState(null),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0);
   const scroll=useRef(null),heading=useRef(null),live=useRef(true),importing=useRef(false);
+  const tabSurface=useSelectionSurface(kind,'','button[aria-pressed="true"]');
   useEffect(()=>{ live.current=true;return()=>{live.current=false;}; },[]);
   useEffect(()=>{const controller=new AbortController();setError('');fetch('/reference-library/catalog.json',{signal:controller.signal}).then(async r=>{if(!r.ok)throw new Error('本地参考图库尚未连接，请重新加载。');return r.json();}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[retry]);
   useEffect(()=>{heading.current?.focus({preventScroll:true});},[]);
@@ -15,8 +17,13 @@ export default function ReferenceLibrary({ onBack, onImport, existingCount, bloc
   const filtered=useMemo(()=>{const terms=query.trim().toLowerCase().split(/\s+/).filter(Boolean);return base.filter(item=>(collection==='全部'||item.collection===collection)&&(category==='全部'||item.category===category)&&terms.every(term=>`${item.code} ${item.name} ${item.keywords} ${item.category}`.toLowerCase().includes(term)));},[base,collection,category,query]);
   const viewFor=item=>item.views.find(v=>v.label===angle)||item.views[0];
   const chosen=view=>selection.some(x=>x.view.id===view.id);
-  function reset(){setLimit(36);setDetail(null);scroll.current?.scrollTo({top:0});}
-  function changeKind(value){setKind(value);setCollection(value==='pose'?'全身单人・标准系':'全部');setCategory('全部');setQuery('');reset();}
+  function reset(keepToolbar=false){
+    const scroller=scroll.current,toolbar=tabSurface.containerRef.current?.parentElement,header=heading.current?.closest('.rl-heading');
+    const pinned=keepToolbar&&scroller&&toolbar&&header&&toolbar.getBoundingClientRect().top<=scroller.getBoundingClientRect().top+1;
+    const top=pinned?scroller.scrollTop+header.getBoundingClientRect().bottom-scroller.getBoundingClientRect().top+parseFloat(getComputedStyle(header).marginBottom):0;
+    setLimit(36);setDetail(null);scroller?.scrollTo({top});
+  }
+  function changeKind(value){if(value===kind)return;setKind(value);setCollection(value==='pose'?'全身单人・标准系':'全部');setCategory('全部');setQuery('');reset(true);}
   function select(item,view){
     setError('');if(chosen(view)){setSelection(current=>current.filter(x=>x.view.id!==view.id));return;}
     if(selection.length>=remaining){setError(`当前创作已有 ${existingCount} 张参考图，还可以选 ${remaining} 张。`);return;}
@@ -37,7 +44,7 @@ export default function ReferenceLibrary({ onBack, onImport, existingCount, bloc
   return <main className="reference-library" id="main-content" aria-label="参考图库" onKeyDown={event=>{if(event.key==='Escape'&&detail){event.stopPropagation();setDetail(null);}}}>
     <div className="rl-scroll" ref={scroll}>
       <div className="rl-heading"><button type="button" className="rl-back" onClick={onBack}><ArrowLeft size={16}/>返回创作</button><div className="rl-heading-row"><div><p className="rl-eyebrow">REFERENCE LIBRARY</p><h1 ref={heading} tabIndex={-1}>让想象，有所参考。</h1><p>选一个动作，搭一套穿着，带回你的创作。</p></div><span className="rl-local"><span/>已连接本地素材</span></div></div>
-      <div className="rl-tools"><div className="rl-tabs" role="group" aria-label="参考素材类型"><button type="button" aria-pressed={kind==='pose'} onClick={()=>changeKind('pose')}><PersonStanding size={18}/>姿势<span>{data?.poseCount||'—'}</span></button><button type="button" aria-pressed={kind==='costume'} onClick={()=>changeKind('costume')}><Shirt size={18}/>服装<span>{data?.costumeCount||'—'}</span></button></div><label className="rl-search"><Search size={17}/><input type="search" aria-label="搜索参考素材" value={query} placeholder={kind==='pose'?'搜索动作、分类或编号…':'搜索英文款式、颜色或编号…'} onChange={e=>{setQuery(e.target.value);reset();}}/></label></div>
+      <div className="rl-tools"><div className="rl-tabs" role="group" aria-label="参考素材类型" ref={tabSurface.containerRef}><span className="rl-tab-surface" ref={tabSurface.surfaceRef} aria-hidden="true" hidden /><button type="button" aria-pressed={kind==='pose'} onClick={event=>{tabSurface.selectFrom(event,'pose');changeKind('pose');}}><PersonStanding size={18}/>姿势<span>{data?.poseCount||'—'}</span></button><button type="button" aria-pressed={kind==='costume'} onClick={event=>{tabSurface.selectFrom(event,'costume');changeKind('costume');}}><Shirt size={18}/>服装<span>{data?.costumeCount||'—'}</span></button></div><label className="rl-search"><Search size={17}/><input type="search" aria-label="搜索参考素材" value={query} placeholder={kind==='pose'?'搜索动作、分类或编号…':'搜索英文款式、颜色或编号…'} onChange={e=>{setQuery(e.target.value);reset();}}/></label></div>
       <div className="rl-filters"><div className="rl-filter-row" role="group" aria-label="素材分组">{(kind==='pose'?collections:['全部']).map(value=><button type="button" key={value} aria-pressed={collection===value} onClick={()=>{setCollection(value);setCategory('全部');reset();}}>{value.replace('全身单人・','').replace('单人','')}</button>)}{kind==='pose'&&<span className="rl-angle"><span>视角</span><select aria-label="姿势视角" value={angle} onChange={e=>setAngle(e.target.value)}>{['正面','俯视','仰视','侧面','斜侧'].map(a=><option key={a}>{a}</option>)}</select></span>}</div><div className="rl-categories" role="group" aria-label="素材分类">{categories.map(value=><button type="button" key={value} aria-pressed={category===value} onClick={()=>{setCategory(value);reset();}}>{value}</button>)}</div></div>
       <div className="rl-count" aria-live="polite"><span>{data?`${filtered.length} ${kind==='pose'?'组姿势':'套服装'}`:'正在连接素材…'}</span><span>{kind==='pose'?'每组可切换多个视角':'点击卡片查看穿搭细节'}</span></div>
       {error&&<div className="rl-error" role="alert">{error}{!data&&<button type="button" onClick={()=>setRetry(x=>x+1)}>重新加载</button>}</div>}

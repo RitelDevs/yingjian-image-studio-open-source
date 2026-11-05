@@ -4,6 +4,7 @@
 
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --paper: #edf4f8; --white: #fff; --ink: #203449; --muted: #3d5266;
   --line: #9caebc40; --blue: #c1def5; --blue-pale: #e7f2fb; --blue-strong: #2066b0;
   --glass: #ffffff40; --glass-bright: #ffffffb8; --glass-edge: #ffffffb3;
