@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownToLine, ArrowRight, Check, Clock3, Copy, ImagePlus, Layers3,
   LoaderCircle, LogOut, Menu, Paperclip, Plus, RefreshCw,
-  Send, Sparkles, Trash2, Wallet, X, Eye, EyeOff, ArrowUpRight, ImageUp, SlidersHorizontal
+  Send, Sparkles, Trash2, Wallet, X, Eye, EyeOff, ArrowUpRight, ImageUp, SlidersHorizontal, Library
 } from 'lucide-react';
 import Inspiration from './Inspiration.jsx';
 import Showcase from './Showcase.jsx';
@@ -21,6 +21,7 @@ import OptionPicker from './OptionPicker.jsx';
 import ProposalCard from './ProposalCard.jsx';
 import KeyConnection from './KeyConnection.jsx';
 import StyleMarket from './StyleMarket.jsx';
+import ReferenceLibrary from './ReferenceLibrary.jsx';
 import StyleOptimization from './StyleOptimization.jsx';
 import ImageViewer from './ImageViewer.jsx';
 import TurnstileVerification from './TurnstileVerification.jsx';
@@ -167,9 +168,9 @@ function AccountAvatar({ user, accountOrigin }) {
   return url && failed !== url ? <img src={url} alt="" width="32" height="32" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} onError={() => setFailed(url)} /> : fallback;
 }
 
-function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLogout, open, setOpen, busy, onOpenMarket, marketOpen, onOpenEditor, editorOpen, accountOrigin }) {
+function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLogout, open, setOpen, busy, onOpenMarket, marketOpen, onOpenEditor, editorOpen, accountOrigin, libraryOpen, onOpenLibrary }) {
   const [search, setSearch] = useState('');
-  const selectedIndex = editorOpen ? 2 : marketOpen ? 1 : 0;
+  const selectedIndex = editorOpen ? 2 : libraryOpen ? 3 : marketOpen ? 1 : 0;
   const visibleThreads = threads.filter(item => item.title.toLowerCase().includes(search.toLowerCase()));
   const toolSurface = useSelectionSurface(selectedIndex, '', '.sidebar-action[aria-current="page"]');
   const threadSurface = useSelectionSurface(activeId, JSON.stringify(visibleThreads.map(item => item.id)), '.thread-row.selected');
@@ -183,6 +184,7 @@ function Sidebar({ threads, activeId, choose, create, remove, rename, user, onLo
         <hr className="sidebar-action-divider" />
         <button className="sidebar-action style-market-nav" onClick={event => { toolSurface.selectFrom(event, 1); onOpenMarket(); setOpen(false); }} aria-current={selectedIndex === 1 ? 'page' : undefined}><Layers3 size={18} /><span>风格市场</span></button>
         <button className="sidebar-action ed-nav-entry" aria-current={selectedIndex === 2 ? 'page' : undefined} onClick={event => { toolSurface.selectFrom(event, 2); onOpenEditor(); setOpen(false); }}><SlidersHorizontal size={18} /><span>图片编辑台</span></button>
+        {onOpenLibrary && <button className="sidebar-action reference-library-nav" aria-current={selectedIndex === 3 ? 'page' : undefined} onClick={event => { toolSurface.selectFrom(event, 3); onOpenLibrary(); setOpen(false); }}><Library size={18}/><span>参考图库</span></button>}
       </nav>
       <div className="sidebar-section-head"><span className="sidebar-section-tag">我的创作</span><span aria-label={`共 ${threads.length} 个创作`}>{threads.length}</span></div>
       {threads.length > 5 && <input className="thread-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索创作" aria-label="搜索创作" />}
@@ -256,20 +258,24 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   const [editorSource, setEditorSource] = useState(null);
   const editorTrigger = useRef(null);
   const [marketOpen, setMarketOpen] = useState(() => location.hash === '#styles');
+  const [libraryOpen, setLibraryOpen] = useState(() => initial.features?.referenceLibrary && location.hash === '#references');
+  const libraryThread = useRef(activeId);
   const marketSession = useRef(0);
   const pendingStyleFocus = useRef(null);
   const marketTrigger = useRef(null);
   const marketDropRef = useRef(null);
   const marketSubjectRef = useRef(null);
-  const navigate = usePageTransition(editorOpen ? 'editor' : marketOpen ? 'market' : 'create');
+  const navigate = usePageTransition(editorOpen ? 'editor' : marketOpen ? 'market' : libraryOpen ? 'library' : 'create');
   useEffect(() => {
     const update = () => {
-      const editor = location.hash === '#editor', market = location.hash === '#styles';
-      navigate(editor ? 'editor' : market ? 'market' : 'create', () => {
+      const editor = location.hash === '#editor', market = location.hash === '#styles', library = initial.features?.referenceLibrary && location.hash === '#references';
+      navigate(editor ? 'editor' : market ? 'market' : library ? 'library' : 'create', () => {
         marketSession.current++;
         setEditorOpen(editor);
         if (editor) setEditorVisited(true);
         setMarketOpen(market);
+        setLibraryOpen(library);
+        if (library) libraryThread.current = activeThread.current;
       });
     };
     window.addEventListener('hashchange', update);
@@ -304,6 +310,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     navigate('market', () => {
       marketSession.current++;
       setMarketOpen(true);
+      setLibraryOpen(false);
       if (location.hash !== '#styles') history.pushState(null, '', location.pathname + location.search + '#styles');
     });
   }
@@ -311,7 +318,8 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     navigate('create', () => {
       marketSession.current++;
       setMarketOpen(false);
-      if (location.hash === '#styles') history.replaceState(null, '', location.pathname + location.search);
+      setLibraryOpen(false);
+      if (['#styles','#references'].includes(location.hash)) history.replaceState(null, '', location.pathname + location.search);
       if (restoreFocus) requestAnimationFrame(() => {
         if (marketTrigger.current?.isConnected && marketTrigger.current.getClientRects().length) marketTrigger.current.focus({ preventScroll: true });
         else textInput.current?.focus({ preventScroll: true });
@@ -322,6 +330,21 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   async function createThread() { backToCreation(false); return create(); }
   const activeThread = useRef(activeId);
   activeThread.current = activeId;
+  function openLibrary() {
+    libraryThread.current = activeThread.current;
+    navigate('library', () => {
+      setMarketOpen(false); setEditorOpen(false); setLibraryOpen(true); setSidebarOpen(false);
+      if (location.hash !== '#references') history.pushState(null, '', location.pathname + location.search + '#references');
+    });
+  }
+  function importLibraryFiles(files) {
+    if (activeThread.current !== libraryThread.current) throw new Error('当前创作已切换，请重新打开图库选择。');
+    const added = addFiles(files);
+    if (!added) throw new Error('没有添加参考图，当前创作可能已达到 4 张上限。');
+    backToCreation(false);
+    setNotice(`已添加 ${added} 张图库参考。补充你的要求后发送，参考图会随本轮请求提交。`);
+    requestAnimationFrame(() => textInput.current?.focus({preventScroll:true}));
+  }
   async function prepareMarketPlan(input) {
     const visit = marketSession.current, sourceThread = activeThread.current;
     const style = STYLE_CATALOG.find(style => style.id === input.styleId && style.version === input.styleVersion);
@@ -413,14 +436,14 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
   }
   async function copy(value) { await navigator.clipboard.writeText(value).then(() => setNotice('已复制提示词')).catch(() => setNotice('复制失败')); }
   return <StudioApiContext.Provider value={api}><div className={`workspace${editorOpen ? ' ed-is-open' : ''}`} inert={sessionBlocked ? true : undefined}>
-    <Sidebar threads={threads} activeId={activeId} choose={chooseThread} create={createThread} remove={remove} rename={rename} user={user} onLogout={logout} open={sidebarOpen} setOpen={setSidebarOpen} busy={creating || logoutBusy || sessionBlocked} accountOrigin={accountOrigin} onOpenMarket={openMarket} marketOpen={marketOpen} onOpenEditor={() => openEditor()} editorOpen={editorOpen} />
+    <Sidebar threads={threads} activeId={activeId} choose={chooseThread} create={createThread} remove={remove} rename={rename} user={user} onLogout={logout} open={sidebarOpen} setOpen={setSidebarOpen} busy={creating || logoutBusy || sessionBlocked} accountOrigin={accountOrigin} onOpenMarket={openMarket} marketOpen={marketOpen} libraryOpen={libraryOpen} onOpenLibrary={initial.features?.referenceLibrary ? openLibrary : undefined} onOpenEditor={() => openEditor()} editorOpen={editorOpen} />
     <div className="workspace-main" style={editorOpen ? { display: 'none' } : undefined}>
       <a className="skip-link" href="#main-content">跳转到创作对话</a>
-      <header className="topbar"><div className="topbar-left"><button className="icon-button menu-toggle" title="打开创作列表" aria-label="打开创作列表" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="breadcrumb"><span>创作空间</span><span className="breadcrumb-slash">/</span><strong>{marketOpen ? '风格市场' : threads.find((item) => item.id === activeId)?.title || '新的创作'}</strong></div></div><div className="topbar-right"><button className="ed-open-top" onClick={() => openEditor()}><SlidersHorizontal size={16} /><span>图片编辑台</span></button><span className="model-chip"><span className="model-dot" /> {imageModelLabel(draft.imageModel)}</span><span className="balance"><Wallet size={16} /> 余额 <strong>{Number(user.balance || 0).toFixed(2)}</strong></span></div></header>
+      <header className="topbar"><div className="topbar-left"><button className="icon-button menu-toggle" title="打开创作列表" aria-label="打开创作列表" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><div className="breadcrumb"><span>创作空间</span><span className="breadcrumb-slash">/</span><strong>{libraryOpen ? '参考图库' : marketOpen ? '风格市场' : threads.find((item) => item.id === activeId)?.title || '新的创作'}</strong></div></div><div className="topbar-right"><button className="ed-open-top" onClick={() => openEditor()}><SlidersHorizontal size={16} /><span>图片编辑台</span></button><span className="model-chip"><span className="model-dot" /> {imageModelLabel(draft.imageModel)}</span><span className="balance"><Wallet size={16} /> 余额 <strong>{Number(user.balance || 0).toFixed(2)}</strong></span></div></header>
       {initial.demo && <div className="demo-strip">本地预览 · 图片和余额为示例，不调用中转</div>}
       {initial.integration && <div className="demo-strip integration-strip">管理员真实联调 · 按中转价格扣费 · 本轮最多 {initial.integration.maxJobs} 个单图请求</div>}
-      <div className={`workspace-stage${marketOpen ? ' is-market' : isEmpty ? ' is-empty' : ''}`}>
-      {marketOpen ? <StyleMarket optimizationAvailable={initial.features?.styleOptimization === true} demo={initial.demo} onChooseStyle={chooseMarketStyle} draft={draft} groups={groups} prepareStylePlan={prepareMarketPlan} onBack={backToCreation} onPrepared={() => {}} addFiles={addFiles} removeRef={removeRef} notice={notice} onClearNotice={() => setNotice('')} referenceDropRef={marketDropRef} subjectInputRef={marketSubjectRef} dropState={drop.state} blocked={sending || messages.some(turn => turn.kind === 'chat' && ['queued', 'running'].includes(turn.status))} /> : <>
+      <div className={`workspace-stage${marketOpen ? ' is-market' : libraryOpen ? ' is-library' : isEmpty ? ' is-empty' : ''}`}>
+      {libraryOpen ? <ReferenceLibrary onBack={() => backToCreation(false)} onImport={importLibraryFiles} existingCount={refs.length} blocked={sending || sessionBlocked} /> : marketOpen ? <StyleMarket optimizationAvailable={initial.features?.styleOptimization === true} demo={initial.demo} onChooseStyle={chooseMarketStyle} draft={draft} groups={groups} prepareStylePlan={prepareMarketPlan} onBack={backToCreation} onPrepared={() => {}} addFiles={addFiles} removeRef={removeRef} notice={notice} onClearNotice={() => setNotice('')} referenceDropRef={marketDropRef} subjectInputRef={marketSubjectRef} dropState={drop.state} blocked={sending || messages.some(turn => turn.kind === 'chat' && ['queued', 'running'].includes(turn.status))} /> : <>
       <main className="conversation" id="main-content" aria-label="创作对话" aria-busy={loading}>
         <div className="conversation-inner">
           {loading && <div className="thread-load-state" role="status"><LoaderCircle className="spin" size={20} /><span>正在加载创作记录…</span></div>}
@@ -450,7 +473,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
           {chosenStyle && <p className="composer-style-hint">{chosenStyle.inputMode === 'reference' ? '上传参考图，发送后查看方案；点 × 取消风格。' : '只写想画的内容即可；点 × 取消内置风格。'}</p>}
           {chosenStyle && prompt.trim().length > 1200 && <p className="composer-style-error" role="status">已有文字已保留。使用风格时最多 1200 字，可缩短内容或移除标签。</p>}
           <ImageGeometry draft={draft} onChange={editDraft}><OptionPicker label="生图模型" className="image-model-select" value={draft.imageModel} options={imageOptions.map(item => ({ value: item.id, label: item.label }))} onChange={imageModel => editDraft({ imageModel })} />{!direct && <OptionPicker label="对话模型" className="chat-model-select" value={draft.chatModel} options={chatModels.map(model => ({ value: model, label: model }))} onChange={chatModel => editDraft({ chatModel })} />}{!direct && chosenStyle && initial.features?.styleOptimization && <StyleOptimization compact style={chosenStyle} value={draft.styleOptimization || 'professional'} onChange={styleOptimization => editDraft({ styleOptimization })} disabled={sending} demo={initial.demo} />}</ImageGeometry>
-          <div className="composer-toolbar"><div className="composer-options"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { addFiles(event.target.files || []); event.target.value = ''; }} /><button className="tool-button" onClick={() => fileInput.current?.click()} title="添加参考图片，也可将图片拖入输入框" aria-label="添加参考图片" disabled={refs.length >= 4}><Paperclip size={18} /></button><span className="toolbar-divider" /><OptionPicker label="尺寸" className="size-select" value={size} options={SIZE_OPTIONS} onChange={size => editDraft({ size, aspectRatio:'auto', pixelWidth: draft.pixelWidth || '1536', pixelHeight:draft.pixelHeight || '1024' })} /><div className="count-control" title="每次生成张数"><button aria-label="减少张数" onClick={() => editDraft({ count: Math.max(1, count - 1) })} disabled={count <= 1}>−</button><span>{count} 张</span><button aria-label="增加张数" onClick={() => editDraft({ count: Math.min(4, count + 1) })} disabled={count >= 4}>+</button></div><OptionPicker label="分组" className="group-select" value={groupId} options={groups.map(item => ({ value: item.id, label: item.name }))} onChange={groupId => editDraft({ groupId })} /></div><button className="send-button" onClick={submitComposer} disabled={!canSubmit} title={direct ? '直接生成，按中转计费' : chosenStyle ? '发送并查看风格方案' : '发送对话'} aria-label={direct ? '直接生成图片' : chosenStyle ? '发送风格描述' : '发送对话'}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}<span>{direct ? '生成' : '发送'}</span></button></div>
+          <div className="composer-toolbar"><div className="composer-options"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { addFiles(event.target.files || []); event.target.value = ''; }} /><button className="tool-button" onClick={() => fileInput.current?.click()} title="添加参考图片，也可将图片拖入输入框" aria-label="添加参考图片" disabled={refs.length >= 4}><Paperclip size={18} /></button>{initial.features?.referenceLibrary && <button type="button" className="tool-button" onClick={openLibrary} aria-label="打开参考图库" title="从姿势和服装库选参考图"><Library size={17}/></button>}<span className="toolbar-divider" /><OptionPicker label="尺寸" className="size-select" value={size} options={SIZE_OPTIONS} onChange={size => editDraft({ size, aspectRatio:'auto', pixelWidth: draft.pixelWidth || '1536', pixelHeight:draft.pixelHeight || '1024' })} /><div className="count-control" title="每次生成张数"><button aria-label="减少张数" onClick={() => editDraft({ count: Math.max(1, count - 1) })} disabled={count <= 1}>−</button><span>{count} 张</span><button aria-label="增加张数" onClick={() => editDraft({ count: Math.min(4, count + 1) })} disabled={count >= 4}>+</button></div><OptionPicker label="分组" className="group-select" value={groupId} options={groups.map(item => ({ value: item.id, label: item.name }))} onChange={groupId => editDraft({ groupId })} /></div><button className="send-button" onClick={submitComposer} disabled={!canSubmit} title={direct ? '直接生成，按中转计费' : chosenStyle ? '发送并查看风格方案' : '发送对话'} aria-label={direct ? '直接生成图片' : chosenStyle ? '发送风格描述' : '发送对话'}>{sending ? <LoaderCircle className="spin" size={19} /> : <Send size={19} />}<span>{direct ? '生成' : '发送'}</span></button></div>
         </div>
         <div className="composer-bottom"><span className="composer-hint">Enter 发送 · Shift + Enter 换行</span><span>{direct ? '直出不调用对话模型 · 点击生成即提交生图' : '对话与生图均按中转计费 · 生图需确认'}</span></div>
       </section>

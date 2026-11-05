@@ -93,6 +93,7 @@ function buildApplication(options, sub2apiAccount) {
   if (sub2apiAccount && (publicOrigin !== sub2apiAccount.origin || publicOrigins.length !== accountOrigins.length ||
       publicOrigins.some(origin => !accountOrigins.includes(origin)))) throw new Error('Central account mode requires the exact configured consumer origins');
   const store = createStore(dataDir);
+  const referenceLibrary = options.referenceLibrary || null;
   function requestPublicOrigin(req) {
     if (!configuredOrigins) return publicOrigin || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
     const origin = publicOrigins.find(value => new URL(value).host === req.headers.host);
@@ -146,7 +147,7 @@ function buildApplication(options, sub2apiAccount) {
   }
   async function api(req, res, path) {
     if (path === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true, version: VERSION, ...(options.previewId ? { previewId: options.previewId } : {}), queue: { active: queue.active, waiting: queue.waiting, limit: queue.limit } });
-    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, imageModels, chatModel, chatModels, integration, features: { styleOptimization: true }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
+    if (path === '/api/config' && req.method === 'GET') return send(res, 200, { demo, version: VERSION, model: gateway.model, imageModels, chatModel, chatModels, integration, features: { styleOptimization: true, ...(referenceLibrary ? { referenceLibrary:true } : {}) }, ssoSources: sso.sourcesFor(requestPublicOrigin(req)), ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer } : {}) });
     if (sub2apiAccount && /^\/api\/(?:login(?:[/-]|$)|demo-login$|sso(?:[/-]|$))/.test(path)) throw new GatewayError('请使用账号中心登录。', 404);
     if (path === '/api/login-config' && req.method === 'GET') { requestPublicOrigin(req); return send(res, 200, await gateway.loginConfig()); }
     if (await sso.handle(req, res, path, { send, parseJson, sessionCookie: cookie })) return;
@@ -210,7 +211,7 @@ function buildApplication(options, sub2apiAccount) {
       checkTestAccount(user);
       store.updateSession(session, { user });
       const groups = groupList(await gateway.groups(session.accessToken, session.context));
-      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, imageModels, chatModel, chatModels, demo, integration, features: { styleOptimization: true }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
+      return send(res, 200, { user: { id: user.id, username: user.username, email: user.email, balance: user.balance }, groups, model: gateway.model, imageModels, chatModel, chatModels, demo, integration, features: { styleOptimization: true, ...(referenceLibrary ? { referenceLibrary:true } : {}) }, ...(sub2apiAccount ? { accountMode: 'sub2api', accountOrigin: sub2apiAccount.issuer, accountSecurityURL: sub2apiAccount.issuer + '/account/#security' } : {}) });
     }
     if (path === '/api/threads' && req.method === 'GET') return send(res, 200, { threads: store.threads(session.user_id) });
     if (path === '/api/threads' && req.method === 'POST') return send(res, 201, { thread: store.createThread(session.user_id) });
@@ -473,6 +474,7 @@ function buildApplication(options, sub2apiAccount) {
     try {
       if (closing) throw new GatewayError('服务正在更新，请稍后再试。', 503);
       if (sub2apiAccount && !(path === '/api/health' && req.method === 'GET') && await sub2apiAccount.handle(req, res)) return;
+      if (referenceLibrary && path.startsWith('/reference-library/')) return referenceLibrary.handle(req, res, path);
       if (path === '/api' || path.startsWith('/api/')) return await api(req, res, path);
       if (path === '/auth' || path.startsWith('/auth/') || path === '/v1' || path.startsWith('/v1/')) throw new GatewayError('页面不存在。', 404);
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new GatewayError('页面不存在。', 404);

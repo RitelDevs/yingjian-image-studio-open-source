@@ -11,6 +11,8 @@
     "package": "pwsh -NoProfile -File scripts/package.ps1",
     "check": "node --test tests/*.test.mjs",
     "preview": "vite preview --host 127.0.0.1",
+    "preview:references": "node scripts/preview-references.mjs",
+    "check:references": "node scripts/check-reference-library.mjs",
     "build:published": "node scripts/build.mjs --published-homepage",
     "release:package": "node scripts/package-release.mjs",
     "check:editor-ui": "node scripts/check-editor-workspace.mjs --build"
