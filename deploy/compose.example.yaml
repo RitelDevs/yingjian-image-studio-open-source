@@ -38,3 +38,7 @@ services:
       - ../dist:/app/dist:ro
       - ../dist-server:/app/dist-server:ro
       - ../data:/app/data
+
+# Optional reference library (prepare assets before enabling):
+# Add environment: REFERENCE_LIBRARY_ROOT: /app/reference-library
+# Add volume: ../reference-library:/app/reference-library:ro

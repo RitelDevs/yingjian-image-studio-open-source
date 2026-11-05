@@ -36,3 +36,7 @@ The browser demonstration image `public/demo/sample.jpg` depicts Vincent van Gog
 
 `RitelSI-Cinzel.woff2` preserves the earlier uppercase-only compatibility subset.
 `RitelSI-Cinzel-mixed-case.woff2` contains the native `Ritel.SI` glyphs used by the current wordmark. Both are subsets of Cinzel pinned to weight 400 and licensed under SIL Open Font License 1.1; see `public/fonts/licenses/Cinzel-OFL.txt`.
+
+## Pose and costume reference libraries
+
+POSE-DB-01 / COSTUME-DB-01 by **ギア (@giaaibusi)**: https://ai-pose-gallery.pages.dev/ and https://ai-costume-gallery.pages.dev/. Chinese pose names: Anhao. Pinned mirrors, original license and redistribution grant are preserved in docs/reference-sources and documented in docs/REFERENCE_LIBRARY.md. These assets are not licensed under the root project MIT license.

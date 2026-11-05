@@ -256,7 +256,7 @@ test('image model is snapshotted in chat plans and cannot be replaced by confirm
   const cookie=await site.login(),thread=await site.thread(cookie);
   const config=(await site.request('/api/me',{cookie})).data;
   assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-flare'&&item.label.includes('快速')));
-  assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-sunburst'&&item.label.includes('牛逼')));
+  assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-sunburst'&&item.label.includes('强力')));
   const plan=await site.chat(cookie,thread,{imageModel:'gpt-image-2.5-flare',references:[{dataUrl:'data:image/png;base64,'+png}]});
   assert.equal(plan.proposal.settings.imageModel,'gpt-image-2.5-flare');assert.equal(plan.context.imageModel,'gpt-image-2.5-flare');
   assert.equal((await site.confirm(cookie,plan.id,{imageModel:'gpt-image-2.5-sunburst'})).status,409);assert.equal(site.calls.images.length,0);

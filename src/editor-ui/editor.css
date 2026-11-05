@@ -3,6 +3,7 @@
 .ed-open-top { display:flex; align-items:center; gap:7px; padding:8px 11px; border:1px solid #ffffffb3; border-radius:12px; background:#ffffff75; color:var(--blue-strong,#2066b0); white-space:nowrap; font-size:12px; }
 .image-editor { --ed-ink:#203449; --ed-muted:#536b80; --ed-blue:#2066b0; --ed-line:#819fb42b; position:fixed; z-index:65; inset:14px; display:flex; flex-direction:column; overflow:hidden; border:1px solid #ffffffc9; border-radius:23px; background:#e9f1f6f7; box-shadow:0 24px 80px #173b5e1a; color:var(--ed-ink); font-size:13px; }
 .image-editor[hidden] { display:none; }
+.workspace-main .image-editor { position:relative;inset:auto;z-index:auto;flex:1;min-width:0;min-height:0;width:100%;height:100%;border:0;border-radius:0;box-shadow:none;background:#e9f1f6b3; }
 .image-editor h1,.image-editor h2,.image-editor h3,.image-editor p { margin:0; }
 .image-editor button { display:inline-flex; align-items:center; justify-content:center; gap:6px; color:inherit; font-size:12px; }
 .image-editor button:disabled { cursor:not-allowed; opacity:.42; }
@@ -119,7 +120,7 @@
 @media (max-width:900px) { .image-editor { inset:8px; border-radius:18px; }.ed-body { grid-template-columns:minmax(0,1fr) 285px; }.ed-canvas-panel { grid-column:1; grid-row:1; }.ed-adjustments,.ed-chat { grid-column:2; grid-row:1; }.image-editor[data-panel="adjust"] .ed-chat,.image-editor[data-panel="chat"] .ed-adjustments { display:none; }.ed-mobile-tabs { display:flex; justify-content:center; gap:8px; padding:9px 12px; border-top:1px solid #fff; background:#edf5fa; flex-shrink:0; }.ed-mobile-tabs button { width:145px; min-height:35px; border:1px solid transparent; background:transparent; border-radius:10px; color:var(--ed-muted); }.ed-mobile-tabs button[aria-pressed="true"] { border-color:#bdd5e7; background:#fff; color:var(--ed-blue); }.ed-header { min-height:70px; }.ed-title h1 { font-size:16px; }.ed-title span { max-width:165px; font-size:10px; }.ed-header-actions { gap:3px; }.ed-header-start { gap:8px; }.ed-reset { display:none!important; } }
 @media (max-width:620px) { .image-editor { inset:0; border:0; border-radius:0; height:100dvh; }.ed-header { gap:8px; min-height:65px; padding:10px 11px; }.ed-title span { display:none; }.ed-title h1 { font-size:14px; }.image-editor .ed-back { width:30px; height:32px; border:0; }.ed-header-start { gap:5px; }.ed-history-actions { gap:0; padding-right:5px; }.image-editor .ed-tool { width:29px; }.ed-compare { padding:8px!important; }.ed-compare span { display:none; }.ed-header-actions > .ed-export > .ed-primary { padding:8px 9px; }.ed-body { display:flex; flex-direction:column; }.ed-canvas-panel { flex:0 0 40%; min-height:160px; max-height:360px; }.ed-canvas-toolbar { min-height:33px; padding:0 15px; font-size:10px; }.ed-canvas-footer { min-height:29px; padding:6px 14px; font-size:9px; }.ed-canvas-footer > span:first-child { font-size:9px; }.ed-panel { flex:1; min-height:0; }.ed-panel-tabs { margin:8px 16px 0; flex-shrink:0; }.ed-panel-scroll { padding-inline:22px; }.ed-section { padding:17px 0; }.ed-presets { grid-template-columns:repeat(6,1fr); gap:7px; }.ed-presets .ed-preset { font-size:10px; }.ed-preset-swatch { border-radius:7px; }.ed-sliders { grid-template-columns:1fr 1fr; column-gap:22px; row-gap:17px; }.ed-panel-foot { min-height:30px; }.ed-chat-heading { display:none; }.ed-chat-messages { padding:15px 18px; }.ed-chat-welcome { padding-top:0; }.ed-chat-welcome-icon { display:none; }.ed-chat-welcome h3 { font-size:14px; }.ed-chat-welcome p { margin:8px 0 14px; font-size:11px; }.ed-chat-examples { gap:6px; }.ed-chat-examples button { padding:8px 10px!important; }.ed-chat-boundary { margin-top:10px; }.ed-chat-input textarea { min-height:53px; height:56px; font-size:16px; padding:9px 11px 3px; }.ed-chat-input-bottom select { font-size:12px; }.ed-chat-form { padding:8px 12px; }.ed-chat-cost { margin-top:6px!important; }.ed-mobile-tabs { padding-bottom:max(8px,env(safe-area-inset-bottom)); }.ed-import-empty { padding:8px; }.ed-import-symbol { display:none; }.ed-empty-eyebrow { display:none; }.ed-import-empty h2 { font-size:20px; }.ed-import-empty > p:not(.ed-empty-eyebrow) { margin:7px 0 13px; font-size:11px; line-height:1.65; }.ed-import-empty > small { margin-top:9px; font-size:9px; }.ed-crop-controls { gap:6px; padding:6px; }.ed-crop-controls > span { display:none; }.ed-crop-values { gap:4px; }.ed-crop-values label { font-size:9px; }.ed-crop-values input { width:29px; }.ed-crop-controls .ed-primary { font-size:10px; min-height:30px; padding:6px 8px; }.ed-open-top span { display:none; } }
 @media (prefers-reduced-motion:reduce) { .image-editor *, .image-editor *:before,.image-editor *:after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
-.workspace.ed-is-open > .sidebar, .workspace.ed-is-open > .sidebar-backdrop { display:none; }
+
 
 .ed-adjustment input[type="range"]::-moz-range-track { height:3px; background:#b7cbdc; border-radius:5px; }
 .ed-adjustment input[type="range"]::-moz-range-thumb { width:10px; height:10px; border:2px solid white; border-radius:50%; background:#2873b2; }
@@ -150,3 +151,18 @@
 .image-editor .ed-value-input:focus-visible { outline:1px solid var(--focus-outline,#576675); outline-offset:1px; }
 .image-editor .ed-value-input[aria-invalid="true"] { box-shadow:0 0 0 1px #bd7254; }
 @media (max-width:620px) { .image-editor .ed-value-input { font-size:16px; } }
+
+/* The editor lives inside the main workspace; respond to panel width. */
+@container studio (max-width:1000px) {
+ .ed-body{grid-template-columns:minmax(0,1fr) 260px}.ed-canvas-panel{grid-column:1;grid-row:1}.ed-adjustments,.ed-chat{grid-column:2;grid-row:1}
+ .image-editor[data-panel="adjust"] .ed-chat,.image-editor[data-panel="chat"] .ed-adjustments{display:none}
+ .ed-mobile-tabs{display:flex;justify-content:center;gap:8px;padding:9px 12px;border-top:1px solid #fff;background:#edf5fa;flex-shrink:0}
+ .ed-mobile-tabs button{width:145px;min-height:35px;border:1px solid transparent;background:transparent;border-radius:10px;color:var(--ed-muted)}
+ .ed-mobile-tabs button[aria-pressed="true"]{border-color:#bdd5e7;background:#fff;color:var(--ed-blue)}
+ .ed-header{gap:8px;padding-inline:12px}.ed-header-actions{gap:5px}.ed-title span{max-width:160px}
+}
+@container studio (max-width:620px) {
+ .ed-body{display:flex;flex-direction:column}.ed-canvas-panel{order:-1;flex:0 0 40%;min-height:160px;max-height:360px}.ed-panel{flex:1;min-height:0}
+ .ed-header{min-height:60px;padding:8px;gap:5px}.ed-title span{display:none}.ed-title h1{font-size:14px}.ed-header-start{gap:5px}.ed-header-actions{gap:2px}
+ .ed-compare span{display:none}.ed-reset{display:none!important}.ed-panel-tabs{margin:8px 16px 0;flex-shrink:0}
+}

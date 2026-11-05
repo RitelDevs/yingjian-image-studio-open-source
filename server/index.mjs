@@ -19,6 +19,7 @@ import { resolveImageGeometry } from '../shared/image-geometry.mjs';
 import { compileStyleRecipe, StyleRecipeError } from './style-recipes.mjs';
 import { createStyleOptimizationSnapshot } from './style-optimizer.mjs';
 import { normalizeStyleOptimization } from '../shared/style-optimization.mjs';
+import { createReferenceLibrary } from './reference-library.mjs';
 
 const APP_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CONTACT = '请联系管理员微信 panrui12。';
@@ -92,8 +93,9 @@ function buildApplication(options, sub2apiAccount) {
   const accountOrigins = sub2apiAccount?.origins ?? (sub2apiAccount ? [sub2apiAccount.origin] : []);
   if (sub2apiAccount && (publicOrigin !== sub2apiAccount.origin || publicOrigins.length !== accountOrigins.length ||
       publicOrigins.some(origin => !accountOrigins.includes(origin)))) throw new Error('Central account mode requires the exact configured consumer origins');
+  const referenceRoot = options.referenceLibraryRoot ?? process.env.REFERENCE_LIBRARY_ROOT;
+  const referenceLibrary = options.referenceLibrary ?? (referenceRoot ? createReferenceLibrary(resolve(referenceRoot)) : null);
   const store = createStore(dataDir);
-  const referenceLibrary = options.referenceLibrary || null;
   function requestPublicOrigin(req) {
     if (!configuredOrigins) return publicOrigin || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
     const origin = publicOrigins.find(value => new URL(value).host === req.headers.host);

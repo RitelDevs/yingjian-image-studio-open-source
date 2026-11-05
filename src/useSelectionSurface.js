@@ -17,7 +17,7 @@ export function useSelectionSurface(selectedKey, layoutKey, selector) {
     const container = containerRef.current;
     const surface = surfaceRef.current;
     const selected = container?.querySelector(selector);
-    if (!container || !surface) return;
+    if (!container || !surface) { bounds.current = null; return; }
     if (!selected) {
       surface.hidden = true;
       bounds.current = null;
@@ -27,8 +27,7 @@ export function useSelectionSurface(selectedKey, layoutKey, selector) {
     }
     const measure = (animate = false) => {
       const next = [selected.offsetLeft, selected.offsetTop, selected.offsetWidth, selected.offsetHeight];
-      // The full-screen editor temporarily removes the sidebar from layout.
-      // Forget hidden geometry so reopening cannot animate from a zero-sized origin.
+      // Forget hidden geometry so reopening cannot use an obsolete origin.
       if (!next[2] || !next[3]) {
         surface.hidden = true;
         bounds.current = null;

@@ -46,3 +46,4 @@ Thumbs.db
 
 # Generated release markers and dependency staging
 .release-generated
+references/

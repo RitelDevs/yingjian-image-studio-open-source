@@ -36,7 +36,7 @@ for(const name of ['react','react-dom','lucide-react','vite','esbuild','playwrig
 const rootFiles=['package.json','package-lock.json','index.html','vite.config.js','.gitignore','.gitattributes','.env.example','README.md','CHANGELOG.md','LICENSE','THIRD_PARTY_NOTICES.md'];
 for(const file of rootFiles)safeCopy(join(root,file),join(source,file));
 for(const dir of ['src','server','shared','public','tests','docs'])safeCopy(join(root,dir),join(source,dir));
-for(const file of ['build.mjs','package-release.mjs','check-editor-workspace.mjs','check-compact-composer.mjs'])safeCopy(join(root,'scripts',file),join(source,'scripts',file));
+for(const file of ['build.mjs','package-release.mjs','check-editor-workspace.mjs','check-compact-composer.mjs','prepare-references.mjs','preview-references.mjs','check-reference-library.mjs','check-reference-motion.mjs'])safeCopy(join(root,'scripts',file),join(source,'scripts',file));
 const deploymentFiles=['README.md','compose.example.yaml','production.env.example','nginx.example.conf','sso-bridge.inc','VISORA.md'];
 for(const file of deploymentFiles){safeCopy(join(root,'deploy',file),join(source,'deploy',file));safeCopy(join(root,'deploy',file),join(deployment,'deploy',file));}
 for(const dir of ['dist','dist-server']){
@@ -46,6 +46,7 @@ for(const dir of ['dist','dist-server']){
 for(const file of ['README.md','CHANGELOG.md','LICENSE','THIRD_PARTY_NOTICES.md','.env.example'])safeCopy(join(root,file),join(deployment,file));
 safeCopy(join(root,'docs'),join(deployment,'docs'));
 safeCopy(join(root,'public','demo'),join(deployment,'public','demo'));
+if(existsSync(join(root,'references')))safeCopy(join(root,'references'),join(deployment,'reference-library'));
 
 function walk(directory){return readdirSync(directory,{withFileTypes:true}).flatMap(item=>item.isDirectory()?walk(join(directory,item.name)):[join(directory,item.name)]);}
 const patterns=[['private-key',/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],['github-token',/(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/],['api-key',/\bsk-[A-Za-z0-9]{32,}\b/],['literal-bearer',/Bearer [A-Za-z0-9_\-]{40,}/]];

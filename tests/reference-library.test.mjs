@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createApplication} from '../server/index.mjs';
@@ -31,4 +31,21 @@ test('missing or traversing indexed assets fail before the optional service star
  const {root}=fixture();try{
   writeFileSync(join(root,'pose-gallery/pose-index.json'),JSON.stringify([{id:'invalid',sys:'system',no:'P01',thumb:'../../other-file',img:'img/fixture.webp'}]));assert.throws(()=>createReferenceLibrary(root),/Invalid reference asset path/);
  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('excluded paired collections have neither catalog entries nor directly accessible assets',async()=>{
+ const {root}=fixture();
+ const index=join(root,'pose-gallery/pose-index.json');
+ const poses=JSON.parse(readFileSync(index,'utf8'));
+ for(const folder of ['img','thumbs'])writeFileSync(join(root,'pose-gallery',folder,'pair60_P001.webp'),'excluded');
+ poses.push({id:'pair60_P001',sys:'双人缠绵',no:'P001',thumb:'thumbs/pair60_P001.webp',img:'img/pair60_P001.webp'});
+ writeFileSync(index,JSON.stringify(poses));
+ const app=createApplication({demo:true,dataDir:join(root,'state'),referenceLibraryRoot:root});
+ await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port;
+ try{
+  const catalog=await(await fetch(base+'/reference-library/catalog.json')).json();
+  assert.equal(catalog.poseImages,2);assert.equal(catalog.poseCount,1);assert.equal(catalog.costumeCount,1);
+  assert(!JSON.stringify(catalog).includes('pair60'));
+  for(const folder of ['img','thumbs'])assert.equal((await fetch(base+'/reference-library/pose/'+folder+'/pair60_P001.webp')).status,404);
+ }finally{await app.close();rmSync(root,{recursive:true,force:true});}
 });

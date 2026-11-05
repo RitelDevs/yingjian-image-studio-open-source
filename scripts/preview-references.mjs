@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 // Explicit loopback-only demo: isolated state and no real upstream credentials.
 const root = resolve(import.meta.dirname,'../../../..');
-const library = createReferenceLibrary(resolve(root,'third-party'));
+const library = createReferenceLibrary(process.env.REFERENCE_LIBRARY_ROOT || resolve(root,'third-party'));
 const gateway = createGateway('http://127.0.0.1:1','gpt-image-2.5-sunburst',true);
 const app = createApplication({demo:true,gateway,referenceLibrary:library,dataDir:resolve('data/reference-preview'),cookieName:'visora_reference_preview',previewId:'reference-library-20261106'});
 const auth = await gateway.login('demo','demo');
