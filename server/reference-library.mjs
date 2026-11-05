@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, createReadStream } from 'node:fs';
 import { join } from 'node:path';
+import { includeReferencePose } from '../shared/reference-policy.mjs';
 
 // Assets are served only from the checked-in indexes, never from arbitrary paths
 // or remote URLs. The library is optional and disabled without its local root.
@@ -11,7 +12,7 @@ export function createReferenceLibrary(root) {
     if (!existsSync(file)) throw new Error('Missing indexed reference asset: ' + path);
     assets.set(url, file); return url;
   }
-  const poses = JSON.parse(readFileSync(join(root, 'pose-gallery/pose-index.json'), 'utf8'));
+  const poses = JSON.parse(readFileSync(join(root, 'pose-gallery/pose-index.json'), 'utf8')).filter(includeReferencePose);
   const costumes = JSON.parse(readFileSync(join(root, 'costume-gallery/costumes-index.json'), 'utf8')).items;
   const grouped = new Map();
   for (const pose of poses) {

@@ -247,6 +247,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     choose, create, remove, rename, attachEditorReference, submit, prepareStylePlan, selectStyle, retryStyleCancellation, styleCancellationPending, confirmPlan, confirming, editDraft, setNotice, addFiles, removeRef, replaceRefs, reloadThread } = conversations;
   const { prompt, refs, size, count, groupId } = draft;
   const direct = draft.generationMode === 'direct';
+  const modeSurface = useSelectionSurface(direct ? 'direct' : 'chat', '', 'button[aria-pressed="true"]');
   const chosenStyle = STYLE_CATALOG.find(style => style.id === draft.selectedStyle?.id && style.version === draft.selectedStyle?.version);
   const chosenExample = chosenStyle && getStyleExample(chosenStyle);
   let geometryValid = true; try { resolveImageGeometry(size, draftAspectRatio(draft), draftPixelSize(draft)); } catch { geometryValid = false; }
@@ -467,7 +468,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
           <div className="composer-drop-overlay" aria-hidden="true"><div className="composer-drop-feedback"><span className="composer-drop-icon"><ImageUp size={24} strokeWidth={1.7} /></span><strong>{dropTitle}</strong><span>{dropHint}</span></div></div>
           <span className="sr-only" role="status" aria-live="polite">{drop.state === 'idle' ? drop.announcement : `${dropTitle}，${dropHint}`}</span>
           {refs.length > 0 && <div className="composer-refs">{refs.map((item, index) => <div className={`composer-ref${item.dropped ? ' is-dropped' : ''}`} key={item.objectUrl || item.mediaId} style={item.dropped ? { transitionDelay: `${item.dropIndex * 40}ms` } : undefined}><img src={item.objectUrl} alt={item.name} /><button title="移除参考图" aria-label="移除参考图" onClick={() => removeRef(index)}><X size={13} /></button></div>)}<span className="ref-label">参考图 {refs.length}/4</span></div>}
-          <div className="composer-mode"><div className="composer-mode-switch" role="group" aria-label="创作模式"><button type="button" aria-pressed={!direct} onClick={() => editDraft({generationMode:'chat'})}>会话模式</button><button type="button" aria-pressed={direct} onClick={() => editDraft({generationMode:'direct'})}>直出模式</button></div><span className="composer-mode-hint">{direct ? '跳过对话，点击生成后按中转计费；风格使用固定规则。' : '先聊需求，确认后才生图。'}</span></div>
+          <div className="composer-mode"><div className="composer-mode-switch" role="group" aria-label="创作模式" ref={modeSurface.containerRef}><span className="composer-mode-surface" ref={modeSurface.surfaceRef} aria-hidden="true" hidden /><button type="button" aria-pressed={!direct} onClick={event => {modeSurface.selectFrom(event,'chat');editDraft({generationMode:'chat'});}}>会话模式</button><button type="button" aria-pressed={direct} onClick={event => {modeSurface.selectFrom(event,'direct');editDraft({generationMode:'direct'});}}>直出模式</button></div><span className="composer-mode-hint">{direct ? '跳过对话，点击生成后按中转计费；风格使用固定规则。' : '先聊需求，确认后才生图。'}</span></div>
           <div className={`composer-text-row${chosenStyle ? ' has-style' : ''}`}>
           {chosenStyle && <span className="composer-style-chip" role="group" aria-label="当前风格">
             <button type="button" className="composer-style-name" aria-label={`更换风格：${chosenStyle.name}`} title={`当前风格：${chosenStyle.name}；点击更换`} onClick={openMarket}>
