@@ -29,7 +29,7 @@ a { color: inherit; }
 .brand-mark { display: block; flex: 0 0 30px; width: 30px; height: 30px; }
 .brand-name { display: inline-flex; align-items: baseline; gap: 7px; font-size: 22px; font-weight: 650; line-height: 1.2; letter-spacing: -.02em; }
 .brand-name > .ritel-account-brand { font-size: 16px; color: var(--ink); text-transform: none; }
-.brand-name > .visora-name { font-family: Outfit, sans-serif; }
+.brand-name > .visora-name { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 400; letter-spacing: 0; text-transform: none; }
 .icon-button { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .icon-button:hover { background: #ffffffb3; color: var(--ink); }
 .primary-button { border: 0; border-radius: 16px; background: var(--blue-strong); color: white; font-weight: 600; box-shadow: 0 6px 16px #2066b022; }
@@ -394,7 +394,8 @@ a.login-button, a.login-button:is(:hover, :focus, :focus-visible, :active),
 .reference-image-item .reference-to-editor { display: block; width: 72px; min-height: 28px; margin-top: 4px; padding: 3px 0; border: 1px solid #ffffffa6; border-radius: 8px; background: #ffffffb3; color: var(--ink); font-size: 12px; }
 @media (max-width: 700px) { .image-actions .image-to-editor { gap: 5px; padding-inline: 10px; font-size: 12px; } }
 
-/* Only the Ritel.SI brand token uses the approved Cinzel original. */
+/* Family identity keeps Cinzel; the product name uses the display face. */
+@font-face{font-family:"Cormorant Garamond";src:url("/fonts/CormorantGaramond-variable-latin.woff2") format("woff2");font-style:normal;font-weight:300 700;font-display:swap}
 @font-face{font-family:"Ritel SI Cinzel";src:url("/fonts/RitelSI-Cinzel-mixed-case.woff2") format("woff2");font-style:normal;font-weight:400;font-display:swap}
 .ritel-account-brand{font-family:"Ritel SI Cinzel",serif;font-weight:400;font-synthesis:none;letter-spacing:0;white-space:nowrap}
 

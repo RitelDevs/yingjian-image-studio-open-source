@@ -7,6 +7,7 @@ The root MIT license covers this project's original code. It does not replace th
 The bundled font files and local UI subsets use the SIL Open Font License 1.1. Preserve the copyright and license text when redistributing:
 
 - JetBrains Mono: `public/fonts/licenses/JetBrainsMono-OFL.txt`
+- Cormorant Garamond: `public/fonts/licenses/CormorantGaramond-OFL.txt`
 - Outfit: `public/fonts/licenses/Outfit-OFL.txt`
 - Noto Sans SC: `public/fonts/licenses/NotoSansSC-OFL.txt`
 - Noto Serif SC: `public/fonts/licenses/NotoSerifSC-OFL.txt`
