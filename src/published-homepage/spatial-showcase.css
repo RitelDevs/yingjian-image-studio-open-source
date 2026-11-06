@@ -79,8 +79,7 @@
   .showcase { --edge: 24px; }
   .showcase-header { inset: 12px 12px auto; gap: 12px; height: 64px; padding: 0 16px; border-radius: 20px; backdrop-filter: blur(24px) saturate(140%); }
   .showcase-header nav { display: none; }
-  .showcase-header .brand-name { font-size: 21px; }
-  .showcase-header .brand-mark { flex-basis: 24px; width: 24px; height: 24px; }
+  .showcase-header .brand { --brand-size: 18px; }
   .showcase-enter { min-height: 44px; padding: 0 14px; gap: 8px; font-size: 12px; }
   .manifesto-stage { height: 150svh; }
   .manifesto-sticky { min-height: 760px; }
