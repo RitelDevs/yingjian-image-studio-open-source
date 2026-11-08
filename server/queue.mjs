@@ -1,3 +1,4 @@
+import { transparencyWarning } from './image-transparency.mjs';
 import { GatewayError, readImageResult } from './gateway.mjs';
 import { conversationContext } from './conversation-context.mjs';
 import { buildChatRequest, chatPayload, parseChatAnswer } from './chat-planner.mjs';
@@ -45,7 +46,7 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
         return;
       }
       const resolved = chat ? buildChatRequest(store, current) : conversationContext(store, current);
-      store.setContext(id, { ...resolved.context, ...(current.context.imageModel ? { imageModel: current.context.imageModel } : {}), ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}), ...(current.context.generationMode ? { generationMode: current.context.generationMode, userPrompt: current.context.userPrompt, ...(current.context.style ? { style: current.context.style, styleSubject: current.context.styleSubject, styleTitle: current.context.styleTitle } : {}) } : {}) });
+      store.setContext(id, { ...resolved.context, ...(current.context.background ? { background: current.context.background } : {}), ...(current.context.imageModel ? { imageModel: current.context.imageModel } : {}), ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}), ...(current.context.generationMode ? { generationMode: current.context.generationMode, userPrompt: current.context.userPrompt, ...(current.context.style ? { style: current.context.style, styleSubject: current.context.styleSubject, styleTitle: current.context.styleTitle } : {}) } : {}) });
       let effectiveReferences = referenceIds;
       if (resolved.image) {
         effectiveReferences = (resolved.inheritedImages || [resolved.image]).map(image => store.addMedia(session.user_id, id, 'input', image.mime, image.bytes));
@@ -56,7 +57,7 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
       const references = effectiveReferences.map((mediaId) => store.media(mediaId, session.user_id));
       if (references.some((item) => !item)) throw new GatewayError('参考图已过期，请重新上传。', 400);
       if (chat) {
-        const settings = { size, count, aspectRatio, groupId, imageModel: current.context.imageModel || gateway.model, ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}) };
+        const settings = { ...(current.context.background ? { background: current.context.background } : {}), size, count, aspectRatio, groupId, imageModel: current.context.imageModel || gateway.model, ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}) };
         const payload = chatPayload(current.model, resolved.conversation, references, settings);
         if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
         originalToken = session.accessToken;
@@ -77,14 +78,16 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
       if (authorizeSession) session = await authorizeBoundSession(store, authorizeSession, job.sessionHash, userId);
       originalToken = session.accessToken;
       liveSession(store, job.sessionHash, userId, { token: originalToken });
-      const answer = await gateway.generate(key, { prompt: resolved.prompt, size, count, references, aspectRatio, model: current.model, pixelSize: current.context.pixelSize });
+      const answer = await gateway.generate(key, { prompt: resolved.prompt, size, count, references, aspectRatio, model: current.model, pixelSize: current.context.pixelSize, background: current.context.background });
       const images = Array.isArray(answer?.data) ? answer.data : [];
       let saved = 0;
+      let backgroundWarning = null;
       let saveFailures = 0;
       for (const image of images.slice(0, count)) {
         try {
           const item = await readImageResult(image);
           store.addMedia(session.user_id, id, 'output', item.mime, item.bytes);
+          if (current.context.background === 'transparent') backgroundWarning ||= transparencyWarning(item);
           saved++;
         } catch {
           saveFailures++;
@@ -96,9 +99,9 @@ export function createQueue(store, gateway, concurrency = 2, ensureKey, { author
           : '上游返回的结果中没有可用图片。请勿立即重复提交，请联系管理员微信 panrui12 核对结果和扣费。',
         502, true, saveFailures ? 'image_save_failed' : 'empty_image_result');
       }
-      store.updateMessage(id, saved === count ? 'done' : 'partial', saved < count
+      store.updateMessage(id, saved === count && !backgroundWarning ? 'done' : 'partial', backgroundWarning || (saved < count
         ? `完成 ${saved}/${count} 张。${saveFailures ? '其余图片未能完整下载或保存。' : '上游只返回了部分图片。'}已保留成功结果，不会自动补发请求；若账单与实际结果不符，请联系管理员微信 panrui12 核对。`
-        : null);
+        : null));
     } catch (error) {
       const known = error instanceof GatewayError;
       const unknown = !known || error.uncertain === true;

@@ -1,3 +1,4 @@
+import { normalizeImageBackground } from '../shared/image-background.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { resolveImageRequestGeometry } from './image-request-geometry.mjs';
@@ -260,7 +261,8 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       // Tools are never passed to the model or executed by this application.
       return typeof answer?.content === 'string' ? answer.content : '';
     },
-    async generate(key, { prompt, size, count, references, aspectRatio = 'auto', model: requestModel = model, pixelSize }) {
+    async generate(key, { prompt, size, count, references, aspectRatio = 'auto', model: requestModel = model, pixelSize, background = 'auto' }) {
+      background = normalizeImageBackground(background);
       const { requestSize } = resolveImageRequestGeometry({ size, aspectRatio, pixelSize, references });
       if (demo) {
         const fs = await import('node:fs/promises');
@@ -278,11 +280,13 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
         body.set('prompt', prompt);
         body.set('size', requestSize);
         body.set('n', String(count));
+        if (background !== 'auto') body.set('background', background);
+        if (background === 'transparent') body.set('output_format', 'png');
         if (useResponseFormat) body.set('response_format', 'b64_json');
         references.forEach((item, index) => body.append('image[]', new Blob([item.bytes], { type: item.mime }), `reference-${index + 1}.${item.mime.split('/')[1]}`));
       } else {
         headers['content-type'] = 'application/json';
-        body = JSON.stringify({ model: requestModel, prompt, size: requestSize, n: count, ...(useResponseFormat ? { response_format: 'b64_json' } : {}) });
+        body = JSON.stringify({ model: requestModel, prompt, size: requestSize, n: count, ...(background !== 'auto' ? { background } : {}), ...(background === 'transparent' ? { output_format: 'png' } : {}), ...(useResponseFormat ? { response_format: 'b64_json' } : {}) });
       }
       let response;
       try {

@@ -147,7 +147,7 @@ export async function runStyleOptimization({ store, gateway, ensureKey, current,
   if (!stillWanted()) { discard(); return; }
   const references = current.referenceIds.map(id => store.media(id, session.user_id));
   if (references.some(item => !item)) throw new GatewayError('参考图已过期，本次尚未提交专业优化。', 400);
-  const settings = { size: current.size, count: current.count, aspectRatio: current.aspectRatio, groupId: current.groupId, imageModel: current.context.imageModel || gateway.model, ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}) };
+  const settings = { ...(current.context.background ? { background: current.context.background } : {}), size: current.size, count: current.count, aspectRatio: current.aspectRatio, groupId: current.groupId, imageModel: current.context.imageModel || gateway.model, ...(current.context.pixelSize ? { pixelSize: current.context.pixelSize } : {}) };
   let answer;
   if (snapshot.demo) answer = demoStyleOptimizationAnswer(snapshot);
   else {

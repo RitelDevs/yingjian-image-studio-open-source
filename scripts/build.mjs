@@ -23,6 +23,7 @@ await buildServer({
   entryPoints: ['server/index.mjs'],
   bundle: true,
   platform: 'node',
+  banner: { js: "import { createRequire as __bundleCreateRequire } from 'node:module'; const require = __bundleCreateRequire(import.meta.url);" },
   target: 'node24',
   format: 'esm',
   outfile: 'dist-server/index.mjs',

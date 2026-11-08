@@ -388,7 +388,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     const visit = marketSession.current, source = activeThread.current;
     const result = await prepareStylePlan({ styleId: chosenStyle.id, styleVersion: chosenStyle.version,
       styleSelectionId: draft.selectedStyle.selectionId, styleOptimization: initial.features?.styleOptimization ? draft.styleOptimization || 'professional' : 'template', subject: prompt.trim(), title: chosenStyle.supportsTitle ? draft.styleTitle || '' : '',
-      size, aspectRatio: draftAspectRatio(draft), pixelSize: draftPixelSize(draft), count, groupId });
+      size, background: draft.background, aspectRatio: draftAspectRatio(draft), pixelSize: draftPixelSize(draft), count, groupId });
     if (result?.ok && visit === marketSession.current && (activeThread.current === source || activeThread.current === result.threadId)) {
       pendingStyleFocus.current = result.planId;
       requestAnimationFrame(() => {
@@ -432,7 +432,7 @@ function Workspace({ initial, onLogout, accountOrigin, sessionPhase }) {
     const wasDirect = item.context?.generationMode === 'direct';
     if (wasDirect) selectStyle(STYLE_CATALOG.find(style => style.id === item.context?.style?.id && style.version === item.context.style.version) || null);
     replaceRefs(item.referenceIds.map((id) => ({ mediaId: id, objectUrl: `/api/media/${id}`, name: '参考图' })), wasDirect ? (item.context.styleSubject ?? item.context.userPrompt ?? item.prompt) : item.prompt);
-    editDraft({ ...imageSettingsForRetry(item), ...(wasDirect ? { generationMode:'direct', styleTitle: item.context.styleTitle || '' } : {}), ...(imageModels.includes(item.model) ? { imageModel: item.model } : {}), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
+    editDraft({ ...imageSettingsForRetry(item), background: item.context?.background || 'auto', ...(wasDirect ? { generationMode:'direct', styleTitle: item.context.styleTitle || '' } : {}), ...(imageModels.includes(item.model) ? { imageModel: item.model } : {}), useContext: item.context?.enabled === true, contextParentId: item.context?.parentId ?? null });
     textInput.current?.focus();
   }
   async function logout() {

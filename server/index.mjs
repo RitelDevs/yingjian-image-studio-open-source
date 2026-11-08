@@ -19,10 +19,15 @@ import { resolveImageGeometry } from '../shared/image-geometry.mjs';
 import { compileStyleRecipe, StyleRecipeError } from './style-recipes.mjs';
 import { createStyleOptimizationSnapshot } from './style-optimizer.mjs';
 import { normalizeStyleOptimization } from '../shared/style-optimization.mjs';
+import { normalizeImageBackground } from '../shared/image-background.mjs';
 import { createReferenceLibrary } from './reference-library.mjs';
 
 const APP_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CONTACT = '请联系管理员微信 panrui12。';
+function imageBackground(value) {
+  try { return normalizeImageBackground(value); }
+  catch (error) { throw new GatewayError(error.message, 400); }
+}
 
 function send(res, status, value, headers = {}) {
   const body = Buffer.from(JSON.stringify(value));
@@ -318,8 +323,9 @@ function buildApplication(options, sub2apiAccount) {
       const optimizationSnapshot = optimizationMode === 'professional' ? createStyleOptimizationSnapshot({
         compiled, subject: (input.subject ?? '').trim(), title: (input.title ?? '').trim(), model: selectedChatModel, demo, styleSelectionId
       }) : null;
-      const context = { enabled: false, imageModel: selectedImageModel, ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}), ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
-      const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId, imageModel: selectedImageModel, ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}) };
+      const background = imageBackground(input.background);
+      const context = { enabled: false, imageModel: selectedImageModel, ...(background !== 'auto' ? { background } : {}), ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}), ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
+      const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId, imageModel: selectedImageModel, background, ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}) };
       const subject = (input.subject ?? '').trim() || `参考图套用：${compiled.style.name}`, title = (input.title ?? '').trim();
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, thread.id, {
@@ -361,6 +367,8 @@ function buildApplication(options, sub2apiAccount) {
       if (plan.proposal.style && store.isStyleRevoked(session.user_id, plan.proposal.styleSelectionId || id)) throw new GatewayError('该风格已取消，请重新整理生成方案。', 409, false, 'style_revoked');
       if (plan.proposal.state !== 'ready') throw new GatewayError('这份方案已被后续对话更新，请确认最新方案。', 409);
       const { size, count, aspectRatio, groupId, pixelSize } = plan.proposal.settings;
+      const background = imageBackground(plan.proposal.settings.background);
+      if (Object.hasOwn(input, 'background') && input.background !== background) throw new GatewayError('方案的背景设置已锁定，请重新整理方案后再切换。', 409, false, 'background_locked');
       const selectedImageModel = imageSelection.stored(plan.proposal.settings.imageModel);
       try { resolveImageGeometry(size, aspectRatio, pixelSize); } catch(error) { throw new GatewayError(error.message,400); }
       if (Object.hasOwn(input, 'imageModel') && input.imageModel !== selectedImageModel) throw new GatewayError('方案的生图模型已锁定，请重新整理方案后再切换。', 409, false, 'image_model_locked');
@@ -371,7 +379,7 @@ function buildApplication(options, sub2apiAccount) {
       const job = store.transaction(() => {
         const record = store.createMessage(session.user_id, plan.threadId, {
           clientRequestId: `confirmed-plan:${id}`, prompt, model: selectedImageModel, size, count, aspectRatio, groupId,
-          context: { ...plan.proposal.context, ...(pixelSize ? { pixelSize } : {}), planId: id, ...(plan.proposal.style ? { style: plan.proposal.style } : {}), ...(plan.proposal.optimization ? { optimization: plan.proposal.optimization } : {}) }
+          context: { ...plan.proposal.context, ...(background !== 'auto' ? { background } : {}), ...(pixelSize ? { pixelSize } : {}), planId: id, ...(plan.proposal.style ? { style: plan.proposal.style } : {}), ...(plan.proposal.optimization ? { optimization: plan.proposal.optimization } : {}) }
         });
         const references = images.map(item => store.addMedia(session.user_id, record.id, 'input', item.mime, item.bytes));
         store.setReferences(record.id, references); store.markConfirmed(id, record.id, prompt);
@@ -394,7 +402,7 @@ function buildApplication(options, sub2apiAccount) {
       if (input.useContext != null && typeof input.useContext !== 'boolean') throw new GatewayError('上下文设置无效。', 400);
       const selectedChatModel = chat ? chatSelection.select(input.chatModel) : null;
       const selectedImageModel = imageSelection.select(input.imageModel);
-      const context = { enabled: chat ? input.useContext !== false : input.useContext === true, imageModel: selectedImageModel };
+      const context = { enabled: chat ? input.useContext !== false : input.useContext === true, imageModel: selectedImageModel, ...(imageBackground(input.background) !== 'auto' ? { background: input.background } : {}) };
       if (context.enabled && Object.hasOwn(input, 'contextParentId')) {
         if (input.contextParentId !== null) {
           if (typeof input.contextParentId !== 'string') throw new GatewayError('上下文记录无效。', 400);

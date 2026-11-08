@@ -179,7 +179,7 @@ export default function StyleMarket({ demo = false, optimizationAvailable = fals
   const search = query.trim().toLocaleLowerCase();
   const visible = STYLE_CATALOG.filter(style => (packageMode === 'all' || style.inputMode === packageMode) && (category === '全部' || style.category === category)
     && `${style.name} ${style.category} ${style.description} ${style.tags.join(' ')}`.toLocaleLowerCase().includes(search));
-  const settings = selected ? settingsByStyle[selected.id] || { ...selected.defaultSettings, ratioWidth: '16', ratioHeight: '9', pixelWidth:'1536', pixelHeight:'1024', groupId: draft.groupId, styleOptimization: 'professional' } : null;
+  const settings = selected ? settingsByStyle[selected.id] || { ...selected.defaultSettings, background: draft.background || 'auto', ratioWidth: '16', ratioHeight: '9', pixelWidth:'1536', pixelHeight:'1024', groupId: draft.groupId, styleOptimization: 'professional' } : null;
   let geometry, geometryError = '';
   if (settings) { try { geometry = resolveImageGeometry(settings.size, draftAspectRatio(settings), draftPixelSize(settings)); } catch (issue) { geometryError = issue.message; } }
   const hasGroup = settings && groups.some(group => String(group.id) === String(settings.groupId));
@@ -205,7 +205,7 @@ export default function StyleMarket({ demo = false, optimizationAvailable = fals
     submitLock.current = true; setBusy(true); setError(''); onClearNotice();
     try {
       const result = await prepareStylePlan({ styleId: selected.id, styleVersion: selected.version, subject: referenceOnly ? '' : subject.trim(),
-        title: selected.supportsTitle ? title.trim() : '', styleOptimization: optimizationAvailable ? settings.styleOptimization || 'professional' : 'template', size: settings.size, aspectRatio: geometry.aspectRatio, pixelSize: geometry.pixelSize, count: settings.count, groupId: settings.groupId });
+        title: selected.supportsTitle ? title.trim() : '', styleOptimization: optimizationAvailable ? settings.styleOptimization || 'professional' : 'template', size: settings.size, aspectRatio: geometry.aspectRatio, pixelSize: geometry.pixelSize, background: settings.background, count: settings.count, groupId: settings.groupId });
       if (!live.current) return;
       if (!result?.ok) { setError(result?.error || '方案暂未创建成功，请重试。'); return; }
       setSelectedId(null);

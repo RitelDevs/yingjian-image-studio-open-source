@@ -141,3 +141,9 @@ size支持A2/A3/A4：以ISO纸张毫米420×594、297×420、210×297按约150DP
 - 创建前写入 `key_creation_pending`；网络中断、5xx 或无法确认的创建响应保留待核对状态，重启后仍阻止重复创建。管理员须先用用户 Key 管理 API 核对创建结果，再决定绑定已创建 Key 或清除已证实未创建的 intent；不要凭超时直接重发。
 
 `key_creation_pending` 为新增表，应用回退可保留该表。回退不得回灌旧业务数据库或丢弃新连接；若回到缺乏此保护的旧版本，未知创建必须先独立核对，不能继续提交任务。
+
+## 背景设置（1.6.1）
+
+/api/jobs、/api/chat 和 /api/style-plans 支持 background=auto|transparent|opaque，省略为auto。背景是明确的用户设置，保存在会话/风格方案中，确认时锁定；确认请求试图替换背景返回409。旧方案缺省按auto兼容。
+
+透明请求无论文生图还是参考图编辑，均发送 background=transparent、output_format=png；auto沿用之前请求格式。网站保留上游原字节，核验真实PNG Alpha；上游返回全不透明或无法核验的结果时保留图片、任务标为partial并说明，不自动重试，不把棋盘格当透明，也不对已有文件进行伪抠图。

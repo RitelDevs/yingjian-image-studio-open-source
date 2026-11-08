@@ -41,3 +41,5 @@ The browser demonstration image `public/demo/sample.jpg` depicts Vincent van Gog
 ## Pose and costume reference libraries
 
 POSE-DB-01 / COSTUME-DB-01 by **ギア (@giaaibusi)**: https://ai-pose-gallery.pages.dev/ and https://ai-costume-gallery.pages.dev/. Chinese pose names: Anhao. Pinned mirrors, original license and redistribution grant are preserved in docs/reference-sources and documented in docs/REFERENCE_LIBRARY.md. These assets are not licensed under the root project MIT license.
+
+PNG alpha validation uses pngjs 7.0.0 (MIT). Its license is included with the deployment dependency notices. Returned image bytes are inspected and preserved.
