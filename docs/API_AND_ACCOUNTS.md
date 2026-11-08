@@ -147,3 +147,5 @@ size支持A2/A3/A4：以ISO纸张毫米420×594、297×420、210×297按约150DP
 /api/jobs、/api/chat 和 /api/style-plans 支持 background=auto|transparent|opaque，省略为auto。背景是明确的用户设置，保存在会话/风格方案中，确认时锁定；确认请求试图替换背景返回409。旧方案缺省按auto兼容。
 
 透明请求无论文生图还是参考图编辑，均发送 background=transparent、output_format=png；auto沿用之前请求格式。网站保留上游原字节，核验真实PNG Alpha；上游返回全不透明或无法核验的结果时保留图片、任务标为partial并说明，不自动重试，不把棋盘格当透明，也不对已有文件进行伪抠图。
+
+1.6.2：background=auto或缺省时，根据本轮原始prompt（风格方案用subject）识别明确的抠图、去背景、透明底要求，任务保存为transparent。识别不使用配方或模型生成文本；手动transparent/opaque优先，明确保留背景/否定透明不触发。前端显示自动识别结果，生成记录标注实际透明设置。旧任务不重放。

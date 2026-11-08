@@ -1,7 +1,7 @@
 import { ArrowLeftRight, SquareDashed, SlidersHorizontal } from 'lucide-react';
 import { ASPECT_RATIOS, PAPER_SIZES, draftPixelSize, draftAspectRatio, resolveImageGeometry } from '../shared/image-geometry.mjs';
 import OptionPicker from './OptionPicker.jsx';
-import { IMAGE_BACKGROUNDS } from '../shared/image-background.mjs';
+import { IMAGE_BACKGROUNDS, resolveImageBackground } from '../shared/image-background.mjs';
 
 const ratioOptions = [
   { value: 'auto', label: '自动', icon: <SquareDashed size={20} /> },
@@ -18,13 +18,15 @@ export default function ImageGeometry({ draft, onChange, children }) {
   catch (issue) { error = issue.message; }
   const paper = Boolean(PAPER_SIZES[draft.size]), pixels = draft.size === 'custom';
   const custom = !paper && !pixels && draft.aspectRatio === 'custom';
+  const detected = (draft.background || 'auto') === 'auto' && resolveImageBackground('auto', draft.prompt) === 'transparent';
+  const backgrounds = detected ? IMAGE_BACKGROUNDS.map(option => option.value === 'auto' ? { ...option, label: '自动 · 透明底' } : option) : IMAGE_BACKGROUNDS;
   return <div className="geometry-controls">
     <div className="geometry-fields">
       {!paper && !pixels && <OptionPicker label="画面比例" className="ratio-select" value={draft.aspectRatio || 'auto'} options={ratioOptions} grid onChange={aspectRatio => onChange({ aspectRatio })} />}
       {paper && <div className="paper-size-info"><span>{draft.size} · {geometry?.paper.widthMM} × {geometry?.paper.heightMM} mm</span><button type="button" className="tool-button" aria-label="切换纸张横竖方向" title="切换横竖方向" onClick={() => onChange({ aspectRatio: (geometry?.width || 0) > (geometry?.height || 0) ? 'portrait' : 'landscape' })}><ArrowLeftRight size={16} /></button></div>}
       {pixels && <div className="custom-ratio custom-pixels" role="group" aria-label="自定义像素尺寸"><label><span>宽</span><input type="number" min="512" max="4096" step="1" inputMode="numeric" aria-label="像素宽" aria-invalid={Boolean(error)} value={draft.pixelWidth ?? '1536'} onChange={event => onChange({ pixelWidth: event.target.value })} /></label><span>×</span><label><span>高</span><input type="number" min="512" max="4096" step="1" inputMode="numeric" aria-label="像素高" aria-invalid={Boolean(error)} value={draft.pixelHeight ?? '1024'} onChange={event => onChange({ pixelHeight: event.target.value })} /></label><span>px</span><button type="button" aria-label="交换像素宽高" onClick={() => onChange({ pixelWidth: draft.pixelHeight || '1024', pixelHeight: draft.pixelWidth || '1536' })}><ArrowLeftRight size={16} /></button></div>}
       {children}
-      <OptionPicker label="背景" className="background-select" value={draft.background || 'auto'} options={IMAGE_BACKGROUNDS} onChange={background => onChange({ background })} />
+      <OptionPicker label="背景" className="background-select" value={draft.background || 'auto'} options={backgrounds} onChange={background => onChange({ background })} />
       {custom && <div className="custom-ratio" role="group" aria-label="自定义宽高比">
         <label><span>宽</span><input aria-label="比例宽" aria-invalid={Boolean(error)} aria-describedby={error ? 'ratio-help ratio-error' : 'ratio-help'} type="number" min="1" max="10000" step="1" inputMode="numeric" value={draft.ratioWidth} onChange={event => onChange({ ratioWidth: event.target.value })} /></label>
         <span aria-hidden="true">:</span>

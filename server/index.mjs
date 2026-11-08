@@ -19,7 +19,7 @@ import { resolveImageGeometry } from '../shared/image-geometry.mjs';
 import { compileStyleRecipe, StyleRecipeError } from './style-recipes.mjs';
 import { createStyleOptimizationSnapshot } from './style-optimizer.mjs';
 import { normalizeStyleOptimization } from '../shared/style-optimization.mjs';
-import { normalizeImageBackground } from '../shared/image-background.mjs';
+import { normalizeImageBackground, resolveImageBackground } from '../shared/image-background.mjs';
 import { createReferenceLibrary } from './reference-library.mjs';
 
 const APP_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -323,7 +323,7 @@ function buildApplication(options, sub2apiAccount) {
       const optimizationSnapshot = optimizationMode === 'professional' ? createStyleOptimizationSnapshot({
         compiled, subject: (input.subject ?? '').trim(), title: (input.title ?? '').trim(), model: selectedChatModel, demo, styleSelectionId
       }) : null;
-      const background = imageBackground(input.background);
+      const background = resolveImageBackground(imageBackground(input.background), input.subject);
       const context = { enabled: false, imageModel: selectedImageModel, ...(background !== 'auto' ? { background } : {}), ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}), ...(optimizationSnapshot ? { styleOptimization: optimizationSnapshot } : {}) };
       const settings = { size, count, aspectRatio: geometry.aspectRatio, groupId, imageModel: selectedImageModel, background, ...(geometry.pixelSize ? { pixelSize: geometry.pixelSize } : {}) };
       const subject = (input.subject ?? '').trim() || `参考图套用：${compiled.style.name}`, title = (input.title ?? '').trim();
@@ -402,7 +402,8 @@ function buildApplication(options, sub2apiAccount) {
       if (input.useContext != null && typeof input.useContext !== 'boolean') throw new GatewayError('上下文设置无效。', 400);
       const selectedChatModel = chat ? chatSelection.select(input.chatModel) : null;
       const selectedImageModel = imageSelection.select(input.imageModel);
-      const context = { enabled: chat ? input.useContext !== false : input.useContext === true, imageModel: selectedImageModel, ...(imageBackground(input.background) !== 'auto' ? { background: input.background } : {}) };
+      const background = resolveImageBackground(imageBackground(input.background), input.prompt);
+      const context = { enabled: chat ? input.useContext !== false : input.useContext === true, imageModel: selectedImageModel, ...(background !== 'auto' ? { background } : {}) };
       if (context.enabled && Object.hasOwn(input, 'contextParentId')) {
         if (input.contextParentId !== null) {
           if (typeof input.contextParentId !== 'string') throw new GatewayError('上下文记录无效。', 400);

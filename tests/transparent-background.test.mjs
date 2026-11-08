@@ -4,6 +4,21 @@ import { PNG } from 'pngjs';
 import { transparencyWarning } from '../server/image-transparency.mjs';
 import { STYLE_CATALOG } from '../shared/style-catalog.mjs';
 import { image, fixture } from './helpers/transparency.mjs';
+import { resolveImageBackground } from '../shared/image-background.mjs';
+
+test('auto recognizes direct background-removal requests while honoring manual choices and negation',()=>{
+  for(const prompt of ['帮我扣掉这张图的底','帮我把背景抠掉','帮我去背景','抠图','透明底','透明背景','remove the background','transparent background','without a background']) assert.equal(resolveImageBackground('auto',prompt),'transparent',prompt);
+  for(const prompt of ['蓝色椅子，白色背景。','透明玻璃花瓶','不要透明背景','不要扣掉这张图的底','不需要抠图','不要去背景','保留原来的背景','do not remove the background','keep the background']) assert.equal(resolveImageBackground('auto',prompt),'auto',prompt);
+  assert.equal(resolveImageBackground('opaque','帮我去背景'),'opaque');
+  assert.equal(resolveImageBackground('transparent','保留背景'),'transparent');
+});
+
+test('the observed auto-background cutout request reaches the edit API with true PNG alpha',async t=>{
+  const f=await fixture(t),{status,data}=await f.request('/api/jobs',f.body({prompt:'帮我扣掉这张图的底',background:'auto',references:[{dataUrl:'data:image/png;base64,'+f.solid.toString('base64')}]}));
+  assert.equal(status,202);const job=await f.wait(data.job.id);assert.equal(job.status,'done');assert.equal(job.context.background,'transparent');
+  assert.equal(f.calls[0].path,'/v1/images/edits');assert.equal(f.calls[0].payload.background,'transparent');assert.equal(f.calls[0].payload.output_format,'png');
+  assert((await f.downloaded(job)).equals(f.transparent));assert.equal(f.calls.length,1);
+});
 
 test('transparent generation and reference edit send native PNG controls and download true alpha unchanged',async t=>{
   const f=await fixture(t);
@@ -38,7 +53,7 @@ test('opaque output is retained with an explicit transparency warning and never 
 test('automatic background preserves existing native requests and invalid choices never dispatch',async t=>{
   const f=await fixture(t);
   assert.equal((await f.request('/api/jobs',f.body({background:'checkerboard'}))).status,400);assert.equal(f.calls.length,0);
-  const {data}=await f.request('/api/jobs',f.body({background:'auto'}));assert.equal((await f.wait(data.job.id)).status,'done');
+  const {data}=await f.request('/api/jobs',f.body({background:'auto',prompt:'蓝色椅子，白色背景。'}));assert.equal((await f.wait(data.job.id)).status,'done');
   assert(!Object.hasOwn(f.calls[0].payload,'background'));assert(!Object.hasOwn(f.calls[0].payload,'output_format'));
   const opaque=await f.request('/api/jobs',f.body({background:'opaque'}));assert.equal((await f.wait(opaque.data.job.id)).status,'done');assert.equal(f.calls.at(-1).payload.background,'opaque');
 });
