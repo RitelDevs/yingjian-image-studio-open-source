@@ -1,4 +1,5 @@
 import { normalizeImageBackground } from '../shared/image-background.mjs';
+import { IMAGE_MODEL_OPTIONS } from '../shared/image-models.mjs';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { resolveImageRequestGeometry } from './image-request-geometry.mjs';
@@ -55,12 +56,20 @@ export function classifyAccountFailure(status, body, path) {
 }
 
 export function classifyFailure(status, body) {
-  const detail = String(body?.error?.message || (typeof body?.error === 'string' ? body.error : '') || body?.message || '');
-  const code = String(body?.error?.code || body?.error?.type || body?.code || '');
+  const detail = String(body?.error?.message || (typeof body?.error === 'string' ? body.error : '') || body?.message || body?.msg || '');
+  const code = String(body?.error?.code || body?.error?.type || body?.code || body?.reason || '');
   const moderation = /^(content_policy_violation|content_filter|content_filtered|safety_violation|moderation_blocked)$/i.test(code)
     || /content[_ -]policy[_ -]violation|safety system|blocked by.{0,30}(safety|moderation|content filter)|violat(?:e|es|ed|ion).{0,35}(content|safety).{0,15}polic|内容.{0,15}(审核未通过|未通过审核|违规|被拦截)|违禁词|色情|不符合.{0,10}(内容|安全).{0,5}(政策|规则)|moderation.{0,15}(blocked|rejected)|NSFW.{0,20}(blocked|rejected|detected)/i.test(detail);
   const billing = '若发现余额已扣除，请联系管理员微信 panrui12 核对。';
   const pending = '请勿立即重复提交，请联系管理员微信 panrui12 核对结果和扣费。';
+  const cause = `${code} ${detail}`;
+  // A generic 503 or missing route does not establish maintenance. Only label it when the upstream explicitly says so.
+  if (/\b(?:channel|model|service|provider)[_ -]maintenance\b|\bmaintenance[_ -](?:mode|in_progress)\b|\b(?:under|scheduled|ongoing)\s+maintenance\b|\bmaintenance\s+(?:in progress|window)\b|(?:渠道|通道|线路|模型|服务|系统).{0,12}维护|维护中|正在维护|暂停服务.{0,8}维护/i.test(cause)) {
+    return new GatewayError(`所选模型的上游渠道正在维护，暂时无法生成。请稍后再试，或手动切换其他生图模型。${status >= 500 ? pending : billing}`, 503, status >= 500, 'channel_maintenance');
+  }
+  if (/\bno[_ -]available[_ -](?:channels?|providers?|accounts?)\b|\bno[_ -](?:available[_ -])?channel[_ -](?:found|available)\b|\b(?:channel|provider)[_ -](?:unavailable|disabled)\b|(?:暂无|没有|无)可用.{0,6}(?:渠道|通道|线路)|(?:渠道|通道|线路).{0,8}(?:不可用|已停用|已禁用)/i.test(cause)) {
+    return new GatewayError(`所选模型当前没有可用的上游渠道。请稍后再试，或手动切换其他生图模型；这不代表提示词有问题。${status >= 500 ? pending : billing}`, 503, status >= 500, 'channel_unavailable');
+  }
   if (moderation) return new GatewayError(`提示词或参考图未通过内容审核，本次未生成图片。请修改内容后重试；${billing}`, 400, false, 'content_refused');
   if (status === 400 && /unknown parameter.{0,20}(?:tools\[\d+\]\.n|['"]n['"])|only.{0,12}(?:n\s*=\s*1|one image)|n.{0,8}must be 1|不支持.{0,8}(?:多张|批量)/i.test(detail)) {
     return new GatewayError(`当前生图线路不支持一次生成多张图片。请将张数改为 1 张后再试。${billing}`, 400, false, 'batch_unsupported');
@@ -272,8 +281,8 @@ export function createGateway(baseUrl, model, demo = false, options = {}) {
       }
       const route = references.length ? '/v1/images/edits' : '/v1/images/generations';
       let body, headers = { authorization: `Bearer ${key}` };
-      // These native Images2.5 aliases reject response_format; their normal response is already readable below.
-      const useResponseFormat = !['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'].includes(requestModel);
+      // Native GPT Image 2.5/2.6 returns b64_json without the legacy response_format request field.
+      const useResponseFormat = !IMAGE_MODEL_OPTIONS.some(item => item.id === requestModel);
       if (references.length) {
         body = new FormData();
         body.set('model', requestModel);

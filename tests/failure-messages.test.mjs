@@ -88,13 +88,34 @@ test('known unsupported image parameters explain interface incompatibility witho
  assert.equal(classifyFailure(400,{error:{message:"Unknown parameter: 'tools[0].n'."}}).reason,'batch_unsupported');
 });
 
-test('Flare and Sunburst omit response_format on JSON and multipart while legacy model requests retain it',async()=>{
+test('2.5 and 2.6 Flare and Sunburst omit response_format on JSON and multipart while legacy model requests retain it',async()=>{
  const requests=[];const upstream=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const text=Buffer.concat(parts).toString(),multipart=String(req.headers['content-type']).includes('multipart'),model=multipart?/name="model"\r\n\r\n([^\r]+)/.exec(text)?.[1]:JSON.parse(text).model;const hasFormat=multipart?text.includes('name="response_format"'):Object.hasOwn(JSON.parse(text),'response_format');requests.push({path:req.url,model,hasFormat});const rejected=model.endsWith('-flare')||model.endsWith('-sunburst')?hasFormat:false;res.writeHead(rejected?400:200,{'content-type':'application/json'}).end(JSON.stringify(rejected?{error:{message:"Unknown parameter: 'response_format'."}}:{data:[{b64_json:'fixture-image'}]}));});await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
  try{
   const gateway=createGateway('http://127.0.0.1:'+upstream.address().port,'gpt-image-2.5');
-  for(const model of ['gpt-image-2.5-flare','gpt-image-2.5-sunburst','gpt-image-2.5'])for(const references of [[],[{mime:'image/png',bytes:Buffer.from('fixture')}]]){
+  for(const model of ['gpt-image-2.5-flare','gpt-image-2.5-sunburst','gpt-image-2.6-flare','gpt-image-2.6-sunburst','gpt-image-2.5'])for(const references of [[],[{mime:'image/png',bytes:Buffer.from('fixture')}]]){
    const result=await gateway.generate('fixture-only-key',{model,prompt:'test',size:'2K',count:1,references});assert.equal(result.data.length,1);const last=requests.at(-1);assert.equal(last.model,model);assert.equal(last.path,references.length?'/v1/images/edits':'/v1/images/generations');assert.equal(last.hasFormat,model==='gpt-image-2.5');
   }
-  assert.equal(requests.length,6);
+  assert.equal(requests.length,10);
  }finally{await new Promise(r=>upstream.close(r));}
+});
+
+test('explicit channel maintenance and unavailable routes have distinct safe recovery messages',()=>{
+ for(const [status,body,reason] of [
+  [400,{error:{message:'Model channel is under maintenance. sk-private-fixture'}},'channel_maintenance'],
+  [503,{error:{code:'channel_maintenance',message:'Internal diagnostic'}},'channel_maintenance'],
+  [403,{message:'当前模型渠道维护中'},'channel_maintenance'],
+  [400,{msg:'渠道维护，请稍后再试'},'channel_maintenance'],
+  [503,{error:{type:'maintenance_mode'}},'channel_maintenance'],
+  [503,{error:{message:'No available channels for this model'}},'channel_unavailable'],
+  [400,{error:{code:'no_available_channel'}},'channel_unavailable'],
+  [503,{message:'当前模型暂无可用渠道'},'channel_unavailable']
+ ]) {
+  const failure=classifyFailure(status,body);
+  assert.equal(failure.reason,reason);assert.equal(failure.status,503);assert.equal(failure.uncertain,status>=500);
+  assert.match(failure.message,reason==='channel_maintenance'?/上游渠道正在维护/:/没有可用的上游渠道/);
+  assert.match(failure.message,/手动切换其他生图模型/);assert.doesNotMatch(failure.message,/sk-private|Internal diagnostic|调整提示词|不会扣费|已退款/);
+ }
+ for(const [status,body] of [[503,{message:'Service unavailable'}],[400,{error:{message:'Request rejected'}}],[429,{message:'Rate limit reached'}]]) {
+  assert.doesNotMatch(classifyFailure(status,body).message,/正在维护|没有可用的上游渠道/);
+ }
 });

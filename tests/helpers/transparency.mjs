@@ -14,7 +14,7 @@ export function image(alpha) {
   return PNG.sync.write(png);
 }
 
-export async function fixture(t, opaque = false, applicationFactory = createApplication) {
+export async function fixture(t, opaque = false, applicationFactory = createApplication, upstreamResponse) {
   const transparent = image(0), solid = image(255), calls = [];
   const upstream = createServer(async(req,res)=>{
     const parts=[];for await(const part of req)parts.push(part);
@@ -22,6 +22,8 @@ export async function fixture(t, opaque = false, applicationFactory = createAppl
     const payload=String(req.headers['content-type']).startsWith('application/json') ? JSON.parse(raw)
       : Object.fromEntries([...raw.matchAll(/name="([^"]+)"\r\n\r\n([^\r]+)/g)].map(m=>[m[1],m[2]]));
     calls.push({path:req.url,payload,bytes});
+    const failure=upstreamResponse?.(payload);
+    if(failure) { res.writeHead(failure.status,{'content-type':'application/json'}).end(JSON.stringify(failure.body));return; }
     const result=!opaque && payload.background==='transparent' && payload.output_format==='png' ? transparent : solid;
     res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({data:[{b64_json:result.toString('base64')}]}));
   });

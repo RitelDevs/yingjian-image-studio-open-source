@@ -253,16 +253,21 @@ test('deployment model allowlist preserves default and rejects invalid configura
 test('image model is snapshotted in chat plans and cannot be replaced by confirm payloads', async () => {
  const site=await fixture();
  try {
-  const cookie=await site.login(),thread=await site.thread(cookie);
+  const cookie=await site.login();
   const config=(await site.request('/api/me',{cookie})).data;
   assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-flare'&&item.label.includes('快速')));
   assert.ok(config.imageModels.some(item=>item.id==='gpt-image-2.5-sunburst'&&item.label.includes('强力')));
-  const plan=await site.chat(cookie,thread,{imageModel:'gpt-image-2.5-flare',references:[{dataUrl:'data:image/png;base64,'+png}]});
-  assert.equal(plan.proposal.settings.imageModel,'gpt-image-2.5-flare');assert.equal(plan.context.imageModel,'gpt-image-2.5-flare');
-  assert.equal((await site.confirm(cookie,plan.id,{imageModel:'gpt-image-2.5-sunburst'})).status,409);assert.equal(site.calls.images.length,0);
+  const models=['gpt-image-2.5-flare','gpt-image-2.5-sunburst','gpt-image-2.6-flare','gpt-image-2.6-sunburst'];
+  assert.ok(models.every(model=>config.imageModels.some(item=>item.id===model&&item.label.includes(model.includes('2.6')?'2.6':'2.5'))));
+  for(const [index,model] of models.entries()) {
+  const thread=await site.thread(cookie);
+  const plan=await site.chat(cookie,thread,{imageModel:model,references:[{dataUrl:'data:image/png;base64,'+png}]});
+  assert.equal(plan.proposal.settings.imageModel,model);assert.equal(plan.context.imageModel,model);
+  assert.equal((await site.confirm(cookie,plan.id,{imageModel:models[(index+1)%models.length]})).status,409);assert.equal(site.calls.images.length,index);
   const accepted=await site.confirm(cookie,plan.id);const duplicate=await site.confirm(cookie,plan.id);
   assert.equal(duplicate.data.job.id,accepted.data.job.id);
-  const done=await site.wait(accepted.data.job.id,cookie);assert.equal(done.model,'gpt-image-2.5-flare');assert.equal(site.calls.images.length,1);assert.equal(site.calls.images[0].payload.model,'gpt-image-2.5-flare');assert.equal(site.calls.images[0].payload.references.length,1);
+  const done=await site.wait(accepted.data.job.id,cookie);assert.equal(done.model,model);assert.equal(site.calls.images.length,index+1);assert.equal(site.calls.images.at(-1).payload.model,model);assert.equal(site.calls.images.at(-1).payload.references.length,1);
+  }
  }finally{await site.stop();}
 });
 
